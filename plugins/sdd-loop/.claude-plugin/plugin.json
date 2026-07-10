@@ -1,0 +1,10 @@
+{
+  "name": "sdd-loop",
+  "version": "0.1.0",
+  "description": "Agentic Spec-Driven Development loop: an SDD-outer / TDD-inner build loop driven from a stakeholder-validated PRD.md and a dev-validated ARCHITECTURE.md. Project-agnostic; parametrized per repo by .sdd/profile.md.",
+  "author": {
+    "name": "Diogo Soares",
+    "email": "soaresdiogodns@gmail.com"
+  },
+  "keywords": ["sdd", "tdd", "methodology", "spec-driven", "agentic", "loop"]
+}
