@@ -10,23 +10,23 @@
       ]
     }
   ],
-  "PreCompact": [
-    {
-      "hooks": [
-        {
-          "type": "command",
-          "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/sdd-pre-compact.sh\""
-        }
-      ]
-    }
-  ],
   "PreToolUse": [
     {
       "matcher": "Edit|Write",
       "hooks": [
         {
           "type": "command",
-          "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/sdd-enforce-tdd.sh\""
+          "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/sdd-enforce-test-first.sh\""
+        }
+      ]
+    }
+  ],
+  "SubagentStop": [
+    {
+      "hooks": [
+        {
+          "type": "command",
+          "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/sdd-verify-subagent.sh\""
         }
       ]
     }

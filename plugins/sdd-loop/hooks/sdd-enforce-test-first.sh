@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# SDD loop · PreToolUse(Edit|Write) — TEST-FIRST enforcement
-# ---------------------------------------------------------
-# Structural teeth for the BDD/TDD discipline, active ONLY when the project opted into
-# `integrity: ... +hook` in .sdd/profile.md. Every issue must commit its behaviour test
-# (BDD outer — ALWAYS required, even for TDD-`skipped` issues) BEFORE any implementation
-# edit. Editing a test file is always allowed.
+# SDD loop · PreToolUse(Edit|Write) — TEST-FIRST (BDD-first) enforcement
+# ---------------------------------------------------------------------
+# NB: this guards the BDD outer test, NOT the inner TDD loop. It has nothing to do with an
+# issue's `Inner loop (TDD)` flag — the behaviour (BDD) test is ALWAYS required, even for
+# TDD-`skipped` issues, so the rule is universal: on an issue/* branch, no implementation edit
+# before a test is committed. Active ONLY when the project opted into `integrity: ... +hook`
+# in .sdd/profile.md. Editing a test file (or docs/spec/state) is always allowed.
 #
 # Design: FAIL-OPEN. On any uncertainty (no jq, no git, no base branch, not on an issue
 # branch, cannot classify the file) it ALLOWS the edit, so the guard can never brick the
@@ -32,6 +33,12 @@ INT_BRANCH="${SDD_INTEGRATION_BRANCH:-develop}"
 
 # Editing a test file IS test-first-compliant.
 printf '%s' "$FILE" | grep -qiE "$TESTPAT" && exit 0
+
+# Docs / spec / loop-state / config are NOT implementation — always allowed (never gated by test-first).
+# This is what lets the worker record a needs-decision to PROGRESS.md, update the backlog, or write an ADR
+# on the issue branch before any test exists. The BDD outer test still gates real code.
+ALLOWPAT="${SDD_ALLOW_PATTERN:-(\.md$|\.mdx$|\.rst$|\.txt$|/docs/|/\.sdd/|/adrs?/|(^|/)PROGRESS\.|(^|/)backlog\.)}"
+printf '%s' "$FILE" | grep -qiE "$ALLOWPAT" && exit 0
 
 # Only guard while on an issue branch.
 git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 || exit 0

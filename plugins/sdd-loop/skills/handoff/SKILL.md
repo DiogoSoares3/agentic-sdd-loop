@@ -17,12 +17,13 @@ If the user passed arguments, treat them as a description of what the next sessi
 
 ## In the SDD loop
 
-In the current architecture the context gate is **hook-driven**: the `PreCompact` hook fires when the main
-session is about to compact, and the `SessionStart` hook re-injects `PROGRESS.md` afterward — so
-**correctness no longer depends on a hand-authored handoff**. `RECORD`-after-every-issue keeping
-`PROGRESS.md` current is the durable checkpoint.
+In the current architecture recovery is **automatic and file-based**: the `SessionStart` hook (resume|compact)
+re-injects `PROGRESS.md` on every resume/compaction, and `RECORD`-after-every-issue keeps `PROGRESS.md`
+current — so **correctness never depends on a hand-authored handoff**. (There is no `PreCompact` handoff: that
+hook cannot inject context, so it was removed; the load-bearing mechanism is `SessionStart` + durable files.)
 
-This skill is now the **optional, richer checkpoint** — write it when the volatile "where I was" is worth
-more than the terse `PROGRESS.md` worklog (a gnarly mid-issue state, a subtle open thread). It is also the
-portable fallback on hosts without the compaction hooks. Write it so **any** fresh consumer resumes from
-files alone; keep the durable truth in `PROGRESS.md` + backlog + git regardless.
+This skill therefore has **no role in the automated loop** — it is never invoked by `/sdd`. It is a **human,
+on-demand tool**: run it when the volatile "where I was" is worth more than the terse `PROGRESS.md` worklog
+(a gnarly mid-issue state, a subtle open thread) and you want a readable narrative to hand to a person or a
+later session. Write it so **any** fresh consumer resumes from files alone; keep the durable truth in
+`PROGRESS.md` + backlog + git regardless.

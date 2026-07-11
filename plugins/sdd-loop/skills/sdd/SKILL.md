@@ -36,11 +36,10 @@ down; change flows up only as a controlled amendment (see *Change control*).
 
 1. `.sdd/profile.md` — the parameters for THIS project (régua, slice, seams, DoD, commands). Verify it
    is **fully filled** (no placeholder/example text) before using it — see the hard stop above.
-2. `PROGRESS.md` (path from the profile) — durable state + latest handoff path.
-3. the latest handoff file (if referenced) — optional now that the **`SessionStart` hook re-injects
-   `PROGRESS.md`** on resume/compact. If missing or stale (temp cleared / reboot), reconstruct from
-   `PROGRESS.md` + backlog + git — those are the durable truth; the handoff is only an optimization.
-4. `PRD.md` + `ARCHITECTURE.md` — only the parts the current slice needs.
+2. `PROGRESS.md` (path from the profile) — durable state; read the **`SDD-CURSOR` block** first
+   (`Phase / Doing / Next / Stop-reason`) for the exact resume point. The **`SessionStart` hook** already
+   re-injects this on resume/compact; if it's missing/stale (fresh session, reboot), read it here.
+3. `PRD.md` + `ARCHITECTURE.md` — only the parts the current slice needs.
 
 Do not re-derive what these already record. Keep dynamic state in `PROGRESS.md`, not in your head.
 
@@ -71,8 +70,8 @@ You are always in exactly one of these states. Decide which from `PROGRESS.md`, 
         │ ESCALATE    │        ▼               ▼               ▼              ▼
         │ /grill-me   │     mid-work        phase end     project end    else → loop
         │ → ADR / PRD │     overflow →      (clean) →     (all IDs+DoD   to SELECT
-        └─────────────┘     PreCompact      re-prime, NO  done) →        (next slice)
-                            hook flush →     handoff →     STOP
+        └─────────────┘     harness         re-prime, NO  done) →        (next slice)
+                            compacts →       handoff →     STOP
                             SessionStart     PLAN next
                             re-prime
 
@@ -105,10 +104,10 @@ You are always in exactly one of these states. Decide which from `PROGRESS.md`, 
 > (stakeholders) and **`ARCHITECTURE.md`** (engineer). Do **not** stop to ask the user to approve the
 > phase-cut or the backlog — cut them autonomously with the rules below and keep moving.
 
-**In `subagent` mode, spawn the [`sdd-phase-opener`](../../agents/phase-opener.md) subagent to do this
-cut** (a bounded, one-window job): it reads the baselines + ADRs, writes the phase PRD + backlog, and
-returns a compact status. In `reprime` mode the main session does the cut inline with the same rules. Either
-way the steps are:
+**Spawn the [`sdd-phase-opener`](../../agents/phase-opener.md) subagent to do this cut** (a bounded,
+one-window job): it reads the baselines + ADRs, writes the phase PRD + backlog, and returns a compact
+status. Its exit is checked by the `SubagentStop` guard (a claimed "opened" with no non-empty backlog is
+sent back). The steps it follows:
 - Derive the current phase from the validated **root `PRD.md`** using the profile's **phase-cutting
   rule**, in dependency order with **MoSCoW priority as the must-first tiebreak** (Must before Should
   before Could; Won't is out of scope). **Inputs to the cut:** the root `PRD.md` (remaining requirement
@@ -134,13 +133,12 @@ way the steps are:
 ### BUILD phase → dispatch issues one at a time
 The build loop is the **issue dispatcher** — read [`dispatcher.md`](dispatcher.md); it is the loop's
 critical seam. The **main session is the orchestrator**; each issue runs in a **bounded
-[`sdd-issue-worker`](../../agents/issue-worker.md)** — a fresh subagent per issue (`subagent` mode), or the
-main session inline (`reprime` mode). Every issue is built on **its own branch off the integration branch
+[`sdd-issue-worker`](../../agents/issue-worker.md)** — a fresh subagent per issue (dispatch is always via
+subagents). Every issue is built on **its own branch off the integration branch
 (`develop`)** — the loop never commits to a protected branch. Per issue:
 - **Select:** first `todo` issue whose blockers are all `done` (**merged**); mark it `doing` and branch
   `issue/<id>-<slug>` off the freshly-pulled integration branch.
-- **Dispatch the `sdd-issue-worker`** (per the profile's `dispatch mode`: `subagent` recommended,
-  `reprime` fallback) with the minimal context pack as **paths**: `.sdd/profile.md` + `PROGRESS.md` +
+- **Dispatch the `sdd-issue-worker`** with the minimal context pack as **paths**: `.sdd/profile.md` + `PROGRESS.md` +
   `docs/phases/phase-N/prd.md` + `ARCHITECTURE.md`/relevant ADRs + **the one issue's scenario + its
   `Inner loop (TDD)` flag**. Not the whole PRD, not the backlog. The worker reads any other **existing**
   spec file itself; the orchestrator is not a file server.
@@ -159,6 +157,11 @@ main session inline (`reprime` mode). Every issue is built on **its own branch o
 - Update `PROGRESS.md`: mark the slice `done` (auto-merge) or `in-review` with its **PR URL**
   (human-review); note what changed, what's next, any open question. Under human-review a human merging
   the PR is what flips the issue to `done` (reconciled on next prime).
+- **Update the `SDD-CURSOR` block** (the four fixed fields the `SessionStart` hook reads): `Phase`, `Doing`
+  (the issue now mid-build, or `none`), `Next` (the true next grabbable `todo`, or `none — phase drained` /
+  `none — project complete` / `none — awaiting-review`), and `Stop-reason` (`none` while running, else the
+  reason the loop paused). This block is the deterministic resume point — keeping it current at every RECORD
+  is what lets a compacted or re-entered session (and the `ask` prompt) know exactly where it is.
 - **Tactical** spec refinements (tighten a criterion) → record here and reflect into `PRD.md`.
   **Structural** changes (scope/architecture) → stop and flow up for re-validation.
 
@@ -182,28 +185,36 @@ definition):
 
 **Tactical, reversible** decisions do NOT escalate: make them and record them in `PROGRESS.md`.
 
-### GATE + HANDOFF — hook-driven, not self-measured
+### GATE — hook-driven, not self-measured
 The old "agent measures ~40% context" trigger was impossible (a model can't read its own window). The
-context gate is now **event-driven by hooks on the main session** (shipped in `hooks/`, self-gating):
+context gate is now **event-driven**, and recovery lives in **one** load-bearing hook plus durable files:
 
-- **Mid-work overflow** — the **`PreCompact` hook** fires when the harness is about to compact (the
-  deterministic trigger). It reminds the session to flush position to `PROGRESS.md`; the harness compacts;
-  the **`SessionStart` hook (resume|compact)** re-injects `PROGRESS.md` + the re-prime checklist, and the
-  loop continues. **No hand-authored `/handoff` is required for correctness** — RECORD-after-every-issue
-  keeps `PROGRESS.md` current and the re-prime reconstructs position. (`/handoff` remains available as an
-  optional richer checkpoint.)
+- **Mid-work overflow (main session)** — the harness compacts; the **`SessionStart` hook (resume|compact)**
+  re-injects `PROGRESS.md` + the re-prime checklist (via `additionalContext`), and the loop continues.
+  **No hand-authored `/handoff` is required for correctness** — RECORD-after-every-issue keeps `PROGRESS.md`
+  current and the re-prime reconstructs position. (There is deliberately no `PreCompact` handoff hook: it
+  cannot inject context into the model, so any reminder there is invisible — it was removed. `/handoff`
+  remains a human-initiated optional checkpoint, never part of the automated loop.)
+- **Silent subagent overflow** — a subagent gets no lifecycle hook, so it compacts silently. Guarded by
+  keeping each subagent bounded (one window), the **`SubagentStop`** verify guard (blocks a hollow-green
+  exit), and the required-TDD `PROGRESS.md` checkpoint (mid-issue resume). See `dispatcher.md`.
 - **Clean boundary (phase drained / project complete)** — nothing is mid-flight; `PROGRESS.md` + backlog +
   git describe it fully. A fresh tick re-primes and PLANs the next phase (or stops if the project is done).
 
-The profile's **handoff mode** governs *who* re-drives the loop after the gate:
+The profile's **continuation mode** governs *whether to proceed* at the gate (not who holds context —
+dispatch is always via subagents). Either way the `SessionStart` hook has already injected the resume cursor
+(`Phase / Doing / Next / Stop-reason`) + the recommended next action deterministically:
 
-- **`auto` (self-continuing; requires subagent support):** the main-session orchestrator keeps dispatching
-  bounded `sdd-issue-worker` subagents, and its own overflow is caught by the `PreCompact`/`SessionStart`
-  hooks + the `/loop` driver — no human, and **no flat supervisor** (that pattern is retired: it put the
-  long-running coordinator inside a subagent, which compacts silently). If subagents are unsupported, fall
-  back to `manual`/`reprime`.
-- **`manual` (default, host-agnostic):** at a boundary, tell the user to start a clean session; the
-  `SessionStart` hook + re-prime gate resume it at the next slice.
+- **`ask` (default):** with the session alive, **present that cursor + recommended action to the user and ask
+  whether to continue** before dispatching. Wait for the answer. This is the supervised default — the loop
+  never silently barrels past a boundary.
+- **`auto`:** the orchestrator keeps dispatching bounded `sdd-issue-worker` subagents without asking; its own
+  overflow is caught by the `SessionStart` re-prime + the `/loop` driver — no human, and **no flat
+  supervisor** (that pattern is retired: it put the long-running coordinator inside a subagent, which
+  compacts silently).
+
+**Regardless of mode**, a `blocked` / `needs-decision` / `needs-revalidation` / `awaiting-review` stop always
+surfaces to a human — `auto` self-continues only the *plannable* boundaries (resume, phase-drained).
 
 Either way `PROGRESS.md` + backlog + git are the durable truth — a fresh context (new session, or the
 harness's own compaction) reconstructs exact position from files, so continuation is always safe.
@@ -247,9 +258,9 @@ open-ended — each iteration either lands an issue or hits a stop. Stop when:
   their dependents → **pause** and surface the open PRs; a human merge re-opens grabbable work.
 - **`blocked` / `needs-decision` / `needs-revalidation`.** Surface per the dispatcher's failure
   handling — the only *unplanned* stops, and the only ones that need a human PRD/ARCH touch.
-- **Gate tripped.** Mid-work overflow (issues remain) → the `PreCompact` hook flushes to `PROGRESS.md`, the
-  `SessionStart` hook re-primes after compaction, the loop continues. Clean boundary (phase drained /
-  project done) → re-prime **without** handoff (files suffice) → PLAN the next phase, or stop if complete.
+- **Gate tripped.** Mid-work overflow (issues remain) → the harness compacts, the `SessionStart` hook
+  re-primes from `PROGRESS.md`, the loop continues. Clean boundary (phase drained / project done) →
+  re-prime **without** handoff (files suffice) → PLAN the next phase, or stop if complete.
 
 ## Change control
 

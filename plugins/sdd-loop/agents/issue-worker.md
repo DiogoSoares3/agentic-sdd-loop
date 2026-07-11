@@ -37,6 +37,10 @@ OUTER (BDD)  Realize the scenario as the behaviour/integration test at the seam 
 INNER (TDD)  Run this step ONLY if `Inner loop (TDD)` is `required` (the default).
              unit test → minimal code → unit green (repeat, one behaviour at a time).
              COMMIT the implementation separately from the test commit.                             [#3]
+             CHECKPOINT (required-TDD only): after each inner unit goes green, append one line to
+             docs/PROGRESS.md — `<issue-id>: unit "<name>" green; next: <what>` — so a SILENT
+             mid-issue compaction can resume from git + PROGRESS. You get no lifecycle hooks; this
+             line is your only durable "where I was". Skip it when the flag is `skipped` (no inner loop).
              When `skipped`: write the minimal implementation that makes the OUTER test green — no
              inner unit loop; every other guard is unchanged.
 CLOSE        - inner units green (n/a when `skipped`)  AND
@@ -60,6 +64,10 @@ LAND         per the profile's merge policy:                                    
 - **Two commits, test-first.** The behaviour test is committed before the implementation.
 - **Re-run from clean at close.** A weakened-but-green test fails the dispatch.
 - Make the **code** satisfy the test, **never** the reverse.
+- **Your stop is verified.** A `SubagentStop` guard re-reads git at exit: if you report success but no
+  test is committed on the `issue/*` branch (or the branch is empty), it **blocks the stop** and sends
+  you back to fix it. A truthful `blocked`/`needs-decision`/`needs-revalidation` return is always let
+  through — so escalate honestly rather than reporting a hollow green.
 
 ## Escalation (no silent failure)
 - **`needs-decision`** — a structural/critical decision no PRD/ARCHITECTURE/ADR covers. Do **not** invent
@@ -77,4 +85,5 @@ LAND         per the profile's merge policy:                                    
 - **Changes:** files touched, test-command output (the green proof), and the merge/PR ref.
 - **PROGRESS delta:** the worklog line + the next issue.
 
-Update `docs/PROGRESS.md` + the backlog status **before returning**. One issue only.
+Update `docs/PROGRESS.md` (worklog + the **`SDD-CURSOR` block**: set `Doing`/`Next`/`Stop-reason` to reflect
+this issue's outcome) + the backlog status **before returning**. One issue only.

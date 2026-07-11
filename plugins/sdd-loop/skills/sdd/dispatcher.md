@@ -3,10 +3,10 @@
 This is where context hygiene, resumability and the double loop meet. The architecture has **one rule that
 explains everything**:
 
-> **The long, continuous coordinator lives in the MAIN session** (only it gets the `PreCompact` /
-> `SessionStart` lifecycle hooks that let it survive compaction). **Subagents are bounded leaves** — a
-> phase cut, or one issue — because a subagent auto-compacts **silently** (no hook fires) and so must never
-> hold long-running work it can't checkpoint.
+> **The long, continuous coordinator lives in the MAIN session** (only it gets the `SessionStart`
+> lifecycle hook that re-primes it after compaction). **Subagents are bounded leaves** — a phase cut, or
+> one issue — because a subagent gets **no lifecycle hook** and auto-compacts **silently**, so it must never
+> hold long-running work it can't checkpoint from files.
 
 Everything below follows from that. Get it right and the loop survives compaction, resumes from files, and
 never games its own test.
@@ -16,8 +16,9 @@ never games its own test.
 ```
 MAIN SESSION = the phase orchestrator   (you, running /sdd; re-driven by /loop)
 │  • holds the state machine + the re-prime gate
-│  • the lifecycle hooks live HERE: SessionStart (re-prime), PreCompact (handoff)
+│  • the SessionStart (re-prime) lifecycle hook lives HERE
 │  • spawns bounded subagents; relays their status; handles escalation via /grill-me
+│  • each subagent's exit is checked by the SubagentStop guard (verify, not coordinate)
 │
 ├─ PLAN a phase  →  spawn  [sdd-phase-opener]   (agents/phase-opener.md — bounded, one phase)
 │                     └─ writes docs/phases/phase-N/prd.md + backlog.md → returns status
@@ -36,27 +37,30 @@ MAIN SESSION = the phase orchestrator   (you, running /sdd; re-driven by /loop)
 - **`sdd-issue-worker`.** One bounded spawn per issue: the double loop to green, land per merge policy,
   return the report. One issue fits one window — which is exactly why it is a subagent.
 
-`reprime` mode (below) collapses the worker into the main session for hosts without subagents; the roles
-are the same, only *who holds the context* changes.
+Dispatch is **always** via subagents — the whole shape (coordinator in the main session, bounded leaves in
+subagents) depends on it, so it is not a knob. Both bounded agents fit one window by design.
 
 ## Deterministic context — injected, not requested
 
 The old failure was leaning on the agent to *choose* to re-read files. Now context is **placed** in the
 context deterministically:
 
-- **`SessionStart` hook (resume|compact)** → re-injects `PROGRESS.md` + the re-prime checklist every time
-  the main session resumes or compacts. The agent doesn't decide to re-prime — the state is already there.
-- **`PreCompact` hook** → the deterministic **handoff trigger** (replaces the impossible "agent measures
-  ~40% context"). Fires when the harness is about to compact; reminds the session to flush position to
-  `PROGRESS.md`. Real recovery = RECORD-after-every-issue keeping `PROGRESS.md` current **+** this re-inject.
-- **Spawn pack** → when the orchestrator spawns a subagent, the pack (Task prompt, optionally a
-  `SubagentStart` hook's `additionalContext`) is assembled deterministically from **file paths**. The
-  subagent then reads those files itself.
+- **`SessionStart` hook (resume|compact)** → re-injects `PROGRESS.md` + the re-prime checklist (via
+  `additionalContext`) every time the main session resumes or compacts. The agent doesn't decide to
+  re-prime — the state is already there. This is the **one** load-bearing compaction-survival mechanism;
+  real recovery = it **+** RECORD-after-every-issue keeping `PROGRESS.md` current. (There is deliberately no
+  `PreCompact` handoff hook: `PreCompact` cannot inject context into the model — it can only run a command
+  or block — so a "flush reminder" there never reaches the agent. It was removed; the durable files + this
+  re-inject do the job.)
+- **Spawn pack** → when the orchestrator spawns a subagent, the pack (Task prompt) is assembled
+  deterministically from **file paths**. The subagent then reads those files itself.
 
 > These hooks are shipped in `hooks/` and are **self-gating**: silent no-op outside an SDD project; the
-> test-first `PreToolUse` guard only bites when the profile sets `integrity: +hook`. (Hook↔subagent
-> lifecycle semantics — esp. that `PreCompact`/`SessionStart` are main-session-only and subagents compact
-> silently — are per current Claude Code docs; confirm empirically on your host, they are load-bearing.)
+> test-first `PreToolUse` guard only bites when the profile sets `integrity: +hook`; the `SubagentStop`
+> verify guard only acts on our two bounded agents and fails open otherwise. (Hook↔subagent lifecycle
+> semantics — esp. that `SessionStart` is main-session-only, `PreToolUse`/`SubagentStop` fire for subagents,
+> and subagents get no compaction hook so they compact silently — are per current Claude Code docs; confirm
+> empirically on your host, they are load-bearing.)
 
 ## The context pack (what a subagent gets — and nothing else)
 
@@ -96,18 +100,31 @@ issue whose work is already in the integration branch as `done` (check `gh pr vi
 --merged` / log for the `issue/<id>` commits). Files stay the truth; this records a landing that already
 happened.
 
-## Two modes (profile: `dispatch mode`)
+## Dispatch (always via subagents)
 
-- **`subagent` (recommended):** the orchestrator spawns a fresh `sdd-issue-worker` per issue (optionally in
-  its own git worktree on the issue branch). Truly clean context per issue; the flag/scenario are re-asserted
-  by the agent definition every spawn, so compaction can't erode them. Requires subagent support.
-- **`reprime` (host-agnostic fallback):** no subagents — the **main session** runs the issue inline (the
-  `sdd-issue-worker` procedure applies to it), `git switch -c`'ing to the issue branch, running the double
-  loop, landing, switching back. Freshness comes from the `SessionStart`/`PreCompact` hooks + `/loop`.
+The orchestrator spawns a fresh `sdd-issue-worker` per issue (optionally in its own git worktree on the
+issue branch) and a bounded `sdd-phase-opener` to cut each phase. Truly clean context per issue; the
+flag/scenario are re-asserted by the agent definition every spawn, so compaction can't erode them. This is
+**not a knob** — the architecture (long-running coordinator in the main session, bounded leaves in
+subagents) depends on it, and the plugin ships for a host (Claude Code) that has subagents. The old
+`reprime` inline fallback is retired: it put the per-issue build inside the long-running main context — the
+exact anti-pattern this design exists to prevent — and it forfeits the `SubagentStop` verify guard.
 
-Both use the branch-per-issue → merge-policy flow; the mode only changes *who holds the context*.
+### Silent subagent compaction — the residual risk, and its defenses
+A subagent gets **no lifecycle hook**, so if it overflows mid-work it compacts **silently** and may lose its
+place, then return claiming success. Three layers guard this, in order of leverage:
+1. **Prevention — bounded size.** One phase / one issue is sized to fit one window (the `~300 LOC` issue
+   anchor). Keep it small enough that a worker never approaches its own compaction. This is the real defense.
+2. **Detection — the `SubagentStop` guard** (`hooks/sdd-verify-subagent.sh`). At exit it re-reads git/files:
+   a worker that reports `green` with **no committed test** on its `issue/*` branch (or an empty branch), or
+   a `phase-opener` that reports "opened" with **no non-empty backlog**, is **blocked** (`decision: block`)
+   and sent back to fix it. An honest `blocked`/`needs-decision`/`needs-revalidation` return is always let
+   through. This converts "compacted and got confused" from a silent success into an explicit retry.
+3. **Recovery — the required-TDD checkpoint.** When `Inner loop (TDD): required`, the worker appends a
+   one-line checkpoint to `PROGRESS.md` after each inner unit goes green, so a silent mid-issue compaction
+   resumes from git + `PROGRESS.md`.
 
-### Isolation (worktrees, `subagent` mode)
+### Isolation (worktrees)
 One issue = one worktree = one branch makes the integrity guards mechanical: the clean re-run runs against a
 fresh checkout; the test-first two-commit rule is auditable on the branch diff; a `blocked` issue never
 lands (discard the worktree, the integration branch stays pristine). Default to **one issue at a time**; do
@@ -142,9 +159,15 @@ Structural, not just prose (the full statements live in `agents/issue-worker.md`
 - **`[#2]` Prove RED for the right reason** before any implementation.
 - **`[#3]` Two commits, test-first.** Behaviour test committed before implementation.
 - **`[#4]` Re-run from clean at close.** A weakened-but-green test fails the dispatch.
-- **`[#5]` Independent check (when `integrity: +hook`/`+verifier`).** The `PreToolUse` hook denies an
-  implementation edit before a test is committed on the branch (test-first, universal — BDD outer is always
-  required); a verifier agent can re-read the branch/PR diff for test-gaming before the merge.
+- **`[#5]` Independent checks.** Two are always-on and one is opt-in:
+  - **`SubagentStop` verify guard (always on).** At the worker's exit it re-reads git: a reported `green`
+    with no committed test on the `issue/*` branch (or an empty branch) is **blocked** and the worker is
+    sent back. Honest escalations pass through. This is the mechanical backstop for a silently-compacted
+    worker that returns a hollow green.
+  - **`PreToolUse` test-first hook (opt-in, `integrity: +hook`).** Denies an implementation edit on an
+    `issue/*` branch until a test is committed (BDD outer is always required); editing a test is allowed.
+  - **Verifier agent (opt-in, `integrity: +verifier`).** Re-reads the branch/PR diff for test-gaming
+    before the merge.
 
 ## Escalation — the orchestrator handles what a leaf can't
 
@@ -188,10 +211,12 @@ Because a dispatch is atomic (one issue, marked `doing`→`done`/`in-review`), r
 
 ## The gate (after every dispatch)
 
-- **Mid-work overflow** — the `PreCompact` hook fires (deterministic), position is flushed to `PROGRESS.md`,
-  compaction happens, the `SessionStart` hook re-injects state, the loop continues. No hand-authored handoff
-  is required for correctness — files + re-prime reconstruct position (the `/handoff` skill remains an
-  optional richer checkpoint you can still write).
+- **Mid-work overflow (main session)** — the harness compacts; the `SessionStart` hook re-injects
+  `PROGRESS.md` + the re-prime checklist, and the loop continues. No hand-authored handoff is required for
+  correctness — RECORD-after-every-issue keeping `PROGRESS.md` current + this re-inject reconstruct position
+  (the `/handoff` skill remains an optional, human-initiated richer checkpoint). In `subagent` dispatch the
+  main context grows mostly *between* issues (it relays reports; the build lives in the worker), so its
+  compaction tends to land at issue boundaries where `PROGRESS.md` is already current.
 - **Clean boundary** (phase drained / project complete) — nothing mid-flight; `PROGRESS.md` + backlog + git
   describe it fully. A fresh tick re-primes and PLANs the next phase, or stops if the project is done. (Under
   `human-review`, a phase boundary with open PRs is `awaiting-review`: pause and surface.)

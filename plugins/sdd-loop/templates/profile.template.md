@@ -55,24 +55,35 @@ The exact command(s) that prove a slice green.
 - **Acceptance scenarios:** issues carry a Gherkin `Scenario:` (authored via `/bdd`), realized as the
   outer behaviour test using the seam/mechanism named in `ARCHITECTURE.md`/ADRs. No matrix here — the
   arch doc owns "how a behaviour is tested in this project".
-- **Dispatch mode:** `subagent` (recommended — the main-session orchestrator spawns a fresh
-  **`sdd-issue-worker`** per issue, optionally in its own git worktree on the issue branch; requires
-  subagent support) or `reprime` (host-agnostic fallback — no subagents, the main session runs each issue
-  inline). Both use the branch-per-issue flow below; the mode only changes *who holds the context*. See the
-  dispatcher spec. (PLAN is cut by the bounded **`sdd-phase-opener`** subagent in `subagent` mode, inline
-  in `reprime`.)
-- **Handoff mode (hook-driven):** `manual` (default, host-agnostic — at a boundary a human starts a clean
-  session; the `SessionStart` hook re-primes it) or `auto` (self-continuing — the orchestrator keeps
-  dispatching workers and its own overflow is caught by the `PreCompact`/`SessionStart` hooks + `/loop`; no
-  human, **no flat supervisor**). `auto` **requires subagent support**. The context gate is a checkpoint,
-  not a stop: `PROGRESS.md` + backlog + git are the durable truth either way.
-- **Backlog review:** `auto` (default — cut the phase backlog and go straight to BUILD) or `confirm`
-  (pause after `/to-issues` and surface the backlog for human approval/edit before building). The two
-  baselines stay the only human-validated docs; this is an optional gate on the derived layer.
-- **Integrity enforcement:** `prose+git` (default — immutable scenario+flag, RED proof, test-first commit,
-  clean re-run) | `+verifier` (independent agent re-reads the **branch/PR diff** for test-gaming) | `+hook`
-  (the shipped `PreToolUse` guard denies an implementation edit before a test is committed on the issue
-  branch — test-first, universal). Escalate uncovered critical decisions via `/grill-me` → ADR/PRD.
+- **Dispatch (fixed — always subagents):** the main-session orchestrator spawns a fresh **`sdd-issue-worker`**
+  per issue (optionally in its own git worktree on the issue branch) and a bounded **`sdd-phase-opener`** to
+  cut each phase. Not a knob — the whole architecture (coordinator in the main session, bounded leaves in
+  subagents) depends on it. See the dispatcher spec.
+- **Continuation mode (gate at a boundary / on resume):** governs what the orchestrator does when the loop
+  reaches a boundary or re-enters after a compaction/crash — **not** who holds context (dispatch is always
+  via subagents).
+  - `ask` (**default**) — the *alive* session pauses, presents the resume cursor from `PROGRESS.md`
+    (`Phase / Doing / Next / Stop-reason`) + the recommended next action, and **asks the user whether to
+    continue** before dispatching. Supervised runs.
+  - `auto` — self-continuing (unattended): keep dispatching workers without asking; own overflow is caught
+    by the `SessionStart` re-prime + `/loop`; **no flat supervisor**. A `blocked` / `needs-decision` /
+    `needs-revalidation` stop always surfaces to a human regardless of this knob.
+  The `SessionStart` hook re-injects the cursor + next action deterministically either way; this knob only
+  decides ask-first vs proceed.
+- **Backlog review (gate at PLAN, before BUILD):** governs the human gate on the *derived scope* of a phase.
+  - `auto` (**default**) — the `sdd-phase-opener`'s cut goes straight to BUILD.
+  - `confirm` — pause after the backlog is cut and surface it for the user to **approve/edit the phase scope**
+    before any build. The two baselines stay the only human-validated docs; this is an optional gate on the
+    derived layer.
+  Orthogonal to Continuation mode: this gates *what gets built* (the plan); Continuation gates *whether to
+  proceed* at a boundary.
+- **Integrity enforcement:** `prose+git +hook` (**default**) — the base (`prose+git`: immutable
+  scenario+flag, RED proof, test-first commit, clean re-run) plus the shipped `PreToolUse` guard
+  (`+hook`: on an `issue/*` branch, deny an implementation edit until a **behaviour/BDD test** is committed
+  — universal, since the BDD outer test is required even for TDD-`skipped` issues; docs/spec/state edits are
+  always allowed). Optionally add `+verifier` (an independent agent re-reads the **branch/PR diff** for
+  test-gaming). Drop to bare `prose+git` only if the project's test paths don't match the default and you
+  don't want to set `SDD_TEST_PATTERN`. Escalate uncovered critical decisions via `/grill-me` → ADR/PRD.
 
 ## Git strategy (branch-per-issue)
 - **Protected branch:** `main` — the loop **never** commits here (human-only `develop → main` promotion).
@@ -94,7 +105,7 @@ The exact command(s) that prove a slice green.
   projection) and **`backlog.md`** (that phase's issues). Deterministic dir name `phase-N` (N = phase
   number); the epic's human name lives in the `prd.md` H1.
 - **Baselines:** root PRD `docs/PRD.md` · technical truth `docs/ARCHITECTURE.md` · ADRs `docs/adrs/`.
-- **Durable state:** `docs/PROGRESS.md` — the single **global** loop cursor (phase/issue, latest handoff).
-  One file, never per-phase.
+- **Durable state:** `docs/PROGRESS.md` — the single **global** loop cursor (the `SDD-CURSOR` block:
+  phase / doing / next / stop-reason). One file, never per-phase.
 - **Templates:** root PRD for `/to-prd` = (path, or "skill default"); phase PRD (filled by PLAN) =
   `templates/prd/phase-PRD.template.md`.

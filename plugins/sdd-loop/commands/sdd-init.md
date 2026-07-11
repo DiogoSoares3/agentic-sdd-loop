@@ -46,20 +46,25 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
      `human-review` **requires** a provider: if none is configured/available, default to `auto-merge`
      (with `none` provider → local merge into the integration branch). Confirm the provider is reachable
      (`gh auth status` / the Bitbucket MCP) before selecting `human-review`.
-   - **Dispatch mode** — `subagent` (recommended; the main-session orchestrator spawns a fresh
-     `sdd-issue-worker` per issue, and `sdd-phase-opener` to cut each phase — requires subagent support) or
-     `reprime` (host-agnostic fallback; no subagents, the main session runs each issue inline). Both use the
-     same branch-per-issue flow; the mode only changes who holds the context.
-   - **Handoff mode** — `manual` (default; at a boundary a human starts a clean session, which the
-     `SessionStart` hook re-primes) or `auto` (self-continuing; the orchestrator keeps dispatching workers
-     and its own overflow is caught by the `PreCompact`/`SessionStart` hooks + `/loop` — no flat supervisor).
-     `auto` **requires subagent support**; if the host lacks it, default to `manual`. For unattended runs,
-     offer to register a **scheduled watchdog** (`/schedule` running `/sdd`) that re-triggers after a session death.
+   - **Continuation mode** (gate at a boundary / on resume) — `ask` (default; the alive session pauses at a
+     boundary or on re-entry, shows the resume cursor + recommended action, and asks the user whether to
+     continue before dispatching) or `auto` (self-continuing/unattended; keeps dispatching without asking,
+     its own overflow caught by the `SessionStart` re-prime + `/loop` — no flat supervisor). This is *whether
+     to proceed at a boundary*, not who holds context (dispatch is always via subagents). A `blocked` /
+     `needs-decision` / `needs-revalidation` stop surfaces to a human either way. For unattended (`auto`)
+     runs, offer to register a **scheduled watchdog** (`/schedule` running `/sdd`) that re-triggers after a
+     session death.
    - **Backlog review** — `auto` (default; the cut phase backlog goes straight to build) or `confirm`
      (pause after `/to-issues` to approve/edit the backlog before building).
-   - **Integrity enforcement** — `prose+git` (default; immutable scenario, RED proof, test-first commit,
-     clean re-run) plus optional `+verifier` (independent agent re-reads the branch/PR diff for
-     test-gaming) and/or `+hook` (block edits to test paths while green).
+   - **Integrity enforcement** — `prose+git +hook` (**default**): the base (`prose+git`: immutable scenario,
+     RED proof, test-first commit, clean re-run) **plus** the shipped `PreToolUse` guard (`+hook`: on an
+     `issue/*` branch, deny an implementation edit until a **behaviour/BDD test** is committed — this gates
+     the BDD outer test, which is required for every issue, so it is orthogonal to the `Inner loop (TDD)`
+     flag; docs/spec/state edits are always allowed). Optionally add `+verifier` (independent agent re-reads
+     the branch/PR diff for test-gaming). If the project's test paths don't match the default detector,
+     mention setting `SDD_TEST_PATTERN` (else drop to bare `prose+git`). Independently of this knob, the
+     `SubagentStop` guard verifies every worker's exit (a "green" with no committed test is blocked) — that
+     backstop is always on.
    - **Phases dir + PROGRESS path** — default `docs/phases/` (each epic → `docs/phases/phase-N/prd.md` +
      `backlog.md`) and a single global `docs/PROGRESS.md`.
    For each, propose a recommended default for the detected project type; let the user correct it.

@@ -36,7 +36,10 @@ sub-agents**. The job fits one context window by design — cut, write, stop.
      model/experiment work where the outer threshold test is the real gate). The **outer scenario is always
      required** — the flag never disables it. This flag is authored **here** and is immutable to the worker.
    - **Blocked by** — blocker issue ids, in dependency order (blockers first), or "None — can start immediately".
-4. **Idempotent.** If the phase PRD / backlog already exist for this phase, reconcile — never duplicate an
+4. **Set the resume cursor.** Update the `SDD-CURSOR` block in `docs/PROGRESS.md`: `Phase: N`, `Doing: none`,
+   `Next: <first grabbable issue id>`, `Stop-reason: none` — so the orchestrator (and the `SessionStart`
+   hook) resume into BUILD at the right issue.
+5. **Idempotent.** If the phase PRD / backlog already exist for this phase, reconcile — never duplicate an
    already-recorded issue.
 
 ## Escalation (no silent decision)
@@ -47,3 +50,8 @@ do **not** invent it: return `needs-decision` + the exact question. The orchestr
 ## Return (compact status only — the orchestrator relays it)
 One line: `phase N opened · <M> issues · docs/phases/phase-N/` — or `needs-decision: <question>`.
 Never build an issue. Never spawn a sub-agent.
+
+Your stop is verified: a `SubagentStop` guard re-reads the filesystem at exit and **blocks** a "phase opened"
+return if no non-empty `backlog.md` exists under `docs/phases/`. So finish writing the phase PRD + backlog
+before returning success; if a decision is missing, return `needs-decision` (which is always let through)
+rather than a hollow "opened".
