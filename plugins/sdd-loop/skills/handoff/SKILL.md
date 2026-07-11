@@ -17,9 +17,12 @@ If the user passed arguments, treat them as a description of what the next sessi
 
 ## In the SDD loop
 
-At the context gate the `sdd` loop calls this skill to write the durable checkpoint, then continues per
-the profile's **handoff mode**: under `auto` a **flat supervisor** spawns the next fresh **worker
-subagent**, which re-primes from this doc + `PROGRESS.md` and resumes the loop (no human); under `manual`
-a human starts the clean session. Under `auto` **the worker authors this doc itself** — it is the one
-holding the context — before returning to the supervisor. Write it so **any** fresh consumer can resume
-from files alone; that is what makes the context gate a checkpoint rather than a stop.
+In the current architecture the context gate is **hook-driven**: the `PreCompact` hook fires when the main
+session is about to compact, and the `SessionStart` hook re-injects `PROGRESS.md` afterward — so
+**correctness no longer depends on a hand-authored handoff**. `RECORD`-after-every-issue keeping
+`PROGRESS.md` current is the durable checkpoint.
+
+This skill is now the **optional, richer checkpoint** — write it when the volatile "where I was" is worth
+more than the terse `PROGRESS.md` worklog (a gnarly mid-issue state, a subtle open thread). It is also the
+portable fallback on hosts without the compaction hooks. Write it so **any** fresh consumer resumes from
+files alone; keep the durable truth in `PROGRESS.md` + backlog + git regardless.

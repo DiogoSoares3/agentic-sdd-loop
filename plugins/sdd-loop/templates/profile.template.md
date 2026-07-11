@@ -55,21 +55,24 @@ The exact command(s) that prove a slice green.
 - **Acceptance scenarios:** issues carry a Gherkin `Scenario:` (authored via `/bdd`), realized as the
   outer behaviour test using the seam/mechanism named in `ARCHITECTURE.md`/ADRs. No matrix here — the
   arch doc owns "how a behaviour is tested in this project".
-- **Fresh-agent mode:** `reprime` (default — re-prime the context pack each `/loop` iteration) or
-  `subagent` (spawn a fresh agent per issue **in its own git worktree on the issue branch**). Both use
-  the branch-per-issue flow below; the mode only changes the checkout. See the dispatcher spec.
-- **Handoff mode:** `manual` (default, host-agnostic — at the context gate write `/handoff` and a human
-  starts a clean session) or `auto` (self-continuing — a **flat supervisor** spawns **sequential worker
-  subagents**: workers hold all context and hit the gate, the near-empty supervisor only respawns them
-  from files + handoff; see the dispatcher's *Autonomous handoff* spec). `auto` **requires subagent
-  support**; files + handoff are the durable state either way, so the context gate is a checkpoint, not
-  a stop.
+- **Dispatch mode:** `subagent` (recommended — the main-session orchestrator spawns a fresh
+  **`sdd-issue-worker`** per issue, optionally in its own git worktree on the issue branch; requires
+  subagent support) or `reprime` (host-agnostic fallback — no subagents, the main session runs each issue
+  inline). Both use the branch-per-issue flow below; the mode only changes *who holds the context*. See the
+  dispatcher spec. (PLAN is cut by the bounded **`sdd-phase-opener`** subagent in `subagent` mode, inline
+  in `reprime`.)
+- **Handoff mode (hook-driven):** `manual` (default, host-agnostic — at a boundary a human starts a clean
+  session; the `SessionStart` hook re-primes it) or `auto` (self-continuing — the orchestrator keeps
+  dispatching workers and its own overflow is caught by the `PreCompact`/`SessionStart` hooks + `/loop`; no
+  human, **no flat supervisor**). `auto` **requires subagent support**. The context gate is a checkpoint,
+  not a stop: `PROGRESS.md` + backlog + git are the durable truth either way.
 - **Backlog review:** `auto` (default — cut the phase backlog and go straight to BUILD) or `confirm`
   (pause after `/to-issues` and surface the backlog for human approval/edit before building). The two
   baselines stay the only human-validated docs; this is an optional gate on the derived layer.
-- **Integrity enforcement:** `prose+git` (default — immutable scenario, RED proof, test-first commit,
+- **Integrity enforcement:** `prose+git` (default — immutable scenario+flag, RED proof, test-first commit,
   clean re-run) | `+verifier` (independent agent re-reads the **branch/PR diff** for test-gaming) | `+hook`
-  (block edits to test paths during GREEN). Escalate uncovered critical decisions via `/grill-me` → ADR/PRD.
+  (the shipped `PreToolUse` guard denies an implementation edit before a test is committed on the issue
+  branch — test-first, universal). Escalate uncovered critical decisions via `/grill-me` → ADR/PRD.
 
 ## Git strategy (branch-per-issue)
 - **Protected branch:** `main` — the loop **never** commits here (human-only `develop → main` promotion).

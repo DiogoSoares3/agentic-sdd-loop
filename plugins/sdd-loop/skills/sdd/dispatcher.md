@@ -1,265 +1,212 @@
-# The issue dispatcher (the loop's critical seam)
+# The dispatcher — main orchestrator + bounded subagents + hooks
 
-This is where context hygiene, resumability and the double loop meet. It runs **exactly one issue to
-green in an isolated context, then reports back**. Get this right and the loop scales; get it wrong
-and context rot or half-done issues creep in. Treat every dispatch as **atomic and idempotent**.
+This is where context hygiene, resumability and the double loop meet. The architecture has **one rule that
+explains everything**:
 
-## The context pack (what the fresh agent gets — and nothing else)
+> **The long, continuous coordinator lives in the MAIN session** (only it gets the `PreCompact` /
+> `SessionStart` lifecycle hooks that let it survive compaction). **Subagents are bounded leaves** — a
+> phase cut, or one issue — because a subagent auto-compacts **silently** (no hook fires) and so must never
+> hold long-running work it can't checkpoint.
 
-Minimal and deterministic. The agent must be able to do the whole issue from *only* this:
+Everything below follows from that. Get it right and the loop survives compaction, resumes from files, and
+never games its own test.
 
-1. `.sdd/profile.md` — the régua, seams, DoD, test command, fresh-agent mode.
-2. `PROGRESS.md` — current state (which issue, prior decisions, open questions).
-3. `docs/phases/phase-N/prd.md` — the phase PRD this issue derives from (NOT the whole canonical PRD).
-4. `ARCHITECTURE.md` + the ADRs the issue touches — the seam + test mechanism.
-5. **The one issue** — its Gherkin `Scenario:`, its `Inner loop (TDD)` flag, and boundaries. One issue, never a batch.
+## The three roles
 
-Do **not** hand it the full backlog, unrelated phases, or the whole PRD. Scope is the point.
+```
+MAIN SESSION = the phase orchestrator   (you, running /sdd; re-driven by /loop)
+│  • holds the state machine + the re-prime gate
+│  • the lifecycle hooks live HERE: SessionStart (re-prime), PreCompact (handoff)
+│  • spawns bounded subagents; relays their status; handles escalation via /grill-me
+│
+├─ PLAN a phase  →  spawn  [sdd-phase-opener]   (agents/phase-opener.md — bounded, one phase)
+│                     └─ writes docs/phases/phase-N/prd.md + backlog.md → returns status
+│
+└─ BUILD an issue →  spawn [sdd-issue-worker]   (agents/issue-worker.md — bounded, ONE issue)
+                      └─ runs the double loop, lands per merge policy → returns report
+```
 
-(`CLAUDE.md` code conventions are ambient — the harness auto-loads them; the build follows them without
-being handed them in the pack.)
+- **Orchestrator (main session).** Its loop: re-prime → read state → spawn the right subagent for the next
+  step → receive one compact status/report → update `PROGRESS.md` + backlog → continue or stop at a gate.
+  It **never** builds an issue itself in `subagent` mode; it dispatches. It **never** nests — only the main
+  session spawns.
+- **`sdd-phase-opener`.** One bounded spawn per phase: derive the next epic from the validated baselines +
+  ADRs, write the phase PRD + backlog (issues with a Gherkin `Scenario:` and the `Inner loop (TDD)` flag).
+  Builds nothing. Fits one window.
+- **`sdd-issue-worker`.** One bounded spawn per issue: the double loop to green, land per merge policy,
+  return the report. One issue fits one window — which is exactly why it is a subagent.
+
+`reprime` mode (below) collapses the worker into the main session for hosts without subagents; the roles
+are the same, only *who holds the context* changes.
+
+## Deterministic context — injected, not requested
+
+The old failure was leaning on the agent to *choose* to re-read files. Now context is **placed** in the
+context deterministically:
+
+- **`SessionStart` hook (resume|compact)** → re-injects `PROGRESS.md` + the re-prime checklist every time
+  the main session resumes or compacts. The agent doesn't decide to re-prime — the state is already there.
+- **`PreCompact` hook** → the deterministic **handoff trigger** (replaces the impossible "agent measures
+  ~40% context"). Fires when the harness is about to compact; reminds the session to flush position to
+  `PROGRESS.md`. Real recovery = RECORD-after-every-issue keeping `PROGRESS.md` current **+** this re-inject.
+- **Spawn pack** → when the orchestrator spawns a subagent, the pack (Task prompt, optionally a
+  `SubagentStart` hook's `additionalContext`) is assembled deterministically from **file paths**. The
+  subagent then reads those files itself.
+
+> These hooks are shipped in `hooks/` and are **self-gating**: silent no-op outside an SDD project; the
+> test-first `PreToolUse` guard only bites when the profile sets `integrity: +hook`. (Hook↔subagent
+> lifecycle semantics — esp. that `PreCompact`/`SessionStart` are main-session-only and subagents compact
+> silently — are per current Claude Code docs; confirm empirically on your host, they are load-bearing.)
+
+## The context pack (what a subagent gets — and nothing else)
+
+Paths, not contents — the worker reads them itself:
+
+1. `.sdd/profile.md` — régua, seams, DoD, test command, merge policy, integrity level.
+2. `PROGRESS.md` — current state.
+3. `docs/phases/phase-N/prd.md` — the phase PRD (NOT the whole root PRD).
+4. `ARCHITECTURE.md` + the ADRs the issue touches — seam + test mechanism.
+5. **The one issue** — its Gherkin `Scenario:`, its `Inner loop (TDD)` flag, boundaries.
+
+Do **not** hand it the full backlog, unrelated phases, or the whole PRD. If it needs another **existing**
+spec file, it **reads it itself** — the orchestrator is not a file server, only an escalation resolver.
+(`CLAUDE.md` conventions are ambient — inherited by the subagent, not packed.)
 
 ## Git strategy (branch-per-issue)
 
-The loop **never commits to a protected branch**. Each issue is built on its own `issue/<id>-<slug>`
-branch off the **integration branch** (`develop` by default) and lands there; `main` is human-only
-(`develop → main` promotion is out of the loop's scope). *How* an issue lands is two profile knobs:
+The loop **never commits to a protected branch**. Each issue is built on its own `issue/<id>-<slug>` branch
+off the **integration branch** (`develop` by default) and lands there; `main` is human-only. Two knobs:
 
-- **PR provider** — `none` (default) | `gh` (GitHub CLI) | `bitbucket-mcp` (Bitbucket MCP). The provider
-  is the PR **surface**; `none` lands locally with no PR.
-- **Merge policy** — how the green branch reaches `develop`:
-  - **`auto-merge` (default, fully autonomous):** on green **+ passing checks/CI**, land the issue and
-    mark it `done` in the same dispatch. With a provider: open the PR and merge it once checks pass; with
-    `none`: merge the issue branch into `develop` locally. **No `in-review` state** — the backlog drains
-    straight to `done`, so the loop runs unattended until the phase (or project) is complete.
-  - **`human-review` (requires a provider):** on green, **push + open a PR and stop at `in-review` — do
-    not merge.** The loop is **non-blocking**: it moves to the next issue whose blockers are `done`. A
-    human reviews and merges, flipping the issue to `done`. Autonomous *within* a phase; a human
-    merge-gate falls at each phase boundary (the next phase's issues stay `todo` until this phase lands).
+- **PR provider** — `none` (default, local merge) | `gh` | `bitbucket-mcp`. The provider is the PR surface.
+- **Merge policy** — how a green branch reaches `develop`:
+  - **`auto-merge` (default):** on green **+ passing checks**, land and mark `done` in the same dispatch. No
+    `in-review` state; the backlog drains straight to `done`, so the loop runs unattended.
+  - **`human-review` (requires a provider):** on green, push + open a PR and stop at `in-review`. The loop
+    is **non-blocking** — it moves to the next issue whose blockers are `done`; a human merge flips it to `done`.
 
 ```
 auto-merge:    todo → doing → done
 human-review:  todo → doing → in-review (PR open, green) → done (PR merged)
 ```
 
-**Selection always requires every blocker to be `done`** (landed on the integration branch), so a
-dependent slice branches off a base that already contains its blocker's code.
+**Selection always requires every blocker to be `done`** (landed on the integration branch).
 
-**Reconcile on prime (both policies):** landing can happen out-of-band — a human PR merge, or an
-`auto-merge` interrupted after the merge but before the status write. At the start of every dispatch,
-mark **any `in-review` or `doing` issue whose work is already in the integration branch** as `done`
-(check via the provider `gh pr view`, or `git branch --merged` / log for the `issue/<id>` commits). Files
-stay the truth; this just records a landing that already happened. The commit is the integrity surface
-(guard `[#5]`).
+**Reconcile on prime (both policies):** at the start of every orchestration tick, mark any `in-review`/`doing`
+issue whose work is already in the integration branch as `done` (check `gh pr view`, or `git branch
+--merged` / log for the `issue/<id>` commits). Files stay the truth; this records a landing that already
+happened.
 
-## Two modes (profile: `fresh-agent mode`)
+## Two modes (profile: `dispatch mode`)
 
-Both modes use the branch-per-issue → PR strategy above; the mode only changes *where the branch is
-checked out* and *who holds the context*.
+- **`subagent` (recommended):** the orchestrator spawns a fresh `sdd-issue-worker` per issue (optionally in
+  its own git worktree on the issue branch). Truly clean context per issue; the flag/scenario are re-asserted
+  by the agent definition every spawn, so compaction can't erode them. Requires subagent support.
+- **`reprime` (host-agnostic fallback):** no subagents — the **main session** runs the issue inline (the
+  `sdd-issue-worker` procedure applies to it), `git switch -c`'ing to the issue branch, running the double
+  loop, landing, switching back. Freshness comes from the `SessionStart`/`PreCompact` hooks + `/loop`.
 
-- **`reprime` (default, host-agnostic):** each `/loop` iteration re-reads the context pack and does
-  one issue in the current session — `git switch -c`'ing to a fresh `issue/<id>-<slug>` branch off the
-  integration branch, running the double loop, landing per the merge policy, then switching back.
-  Freshness comes from the handoff gate (context ~40% / end of phase → `/handoff` → clean session).
-  Simple; ship first.
-- **`subagent` (opt-in):** the orchestrator spawns a genuinely fresh agent per issue with the pack
-  above, **in its own git worktree on the issue branch**; it runs the double loop, lands per the merge
-  policy, and returns the report contract below. Truly clean context per issue. Use only when
-  accumulation in `reprime` actually hurts (rule of three), and only if the host supports subagents.
-
-The rest of this file is identical for both modes — only the checkout mechanism and *who* holds the
-context differ.
+Both use the branch-per-issue → merge-policy flow; the mode only changes *who holds the context*.
 
 ### Isolation (worktrees, `subagent` mode)
+One issue = one worktree = one branch makes the integrity guards mechanical: the clean re-run runs against a
+fresh checkout; the test-first two-commit rule is auditable on the branch diff; a `blocked` issue never
+lands (discard the worktree, the integration branch stays pristine). Default to **one issue at a time**; do
+not run worktrees in parallel unless throughput genuinely demands it.
 
-One issue = one worktree = one branch. This makes the integrity guards cheap and mechanical:
-- The **clean re-run** `[#4]` runs against a fresh checkout by construction.
-- The **two-commit** rule `[#3]` is auditable: the branch's first commit must touch **only test
-  files**; the verifier reads exactly this branch's diff (the PR, under `human-review`) to check the
-  test wasn't moved to fit the code.
-- **Land only on green** is the gate — a `blocked` issue never lands (never opens a PR / never merges);
-  its partial state stays quarantined on its branch (discard the worktree; the integration branch stays
-  pristine, and the harness auto-cleans an unchanged one).
-
-Worktrees isolate and audit; they do **not** prevent an agent from weakening its *own* test on its
-*own* branch — that is still the immutable-scenario rule `[#1]` + the land/merge gate + the verifier.
-Default to **one issue at a time**; do not run worktrees in parallel unless throughput genuinely
-demands it (merge conflicts + context hygiene cost more than they return on a solo/graded project).
-
-## Per-issue procedure (the double loop)
+## Per-issue procedure (the double loop) — carried by `sdd-issue-worker`
 
 ```
-PRE    reconcile: mark any `in-review`/`doing` issue already landed in the integration branch as `done`.
-       select: first `todo` whose blockers are all `done` (landed). Mark it `doing`.
-       branch: from the freshly-pulled integration branch, create `issue/<id>-<slug>`
-       (reprime: `git switch -c`; subagent: new worktree on that branch). Never work on a protected branch.
-OUTER  (BDD)  /bdd realize → write the behaviour/integration test from the scenario.
-       Run it → it FAILS. Capture the RED output (feature absent, not a typo) into PROGRESS.  [#2]
-       COMMIT the test alone — a test-only commit, before any implementation.                 [#3]
-INNER  (TDD)  Run this step **only if the issue's `Inner loop (TDD)` is `required`** (the default).
-       /tdd loop: unit test → minimal code → unit green  (repeat, one behaviour at a time).
-       COMMIT the implementation separately from the test commit.                             [#3]
-       When `skipped`: write the **minimal implementation that makes the OUTER test green**, committed
-       separately from the test commit — no inner unit loop; every other guard is unchanged.
-CLOSE  - inner units green  (n/a when `Inner loop (TDD)` is `skipped`)  AND
-       - outer behaviour test green  AND
-       - the phase DoD items this issue touches pass (run the profile's test command)
-       - re-run the test command from a CLEAN checkout; assertions unchanged-or-stronger vs the
-         RED snapshot — a weakened-but-green test FAILS the dispatch                           [#4]
-       - refactor while green
-POST   LAND per the profile's merge policy:                                                         [#5]
-       - auto-merge:   land on green + passing checks (provider: open+merge the PR; none: merge the
-                       branch into `develop` locally). Mark the issue `done`.
-       - human-review: push + open a PR into the integration branch (scenario + green proof in the
-                       body); mark `in-review`, record the PR URL. Do NOT merge — a human does.
-       PROGRESS: worklog line + next issue + any open question. subagent: discard the worktree.
-       Continue to the next issue whose blockers are `done`.
+PRE    reconcile landed issues → done. Select first `todo` whose blockers are all `done`; mark `doing`.
+       Branch issue/<id>-<slug> off the freshly-pulled integration branch. Never a protected branch.
+OUTER  (BDD)  realize the scenario as the behaviour test at the arch seam → run → it FAILS (feature absent).
+       Record the RED output.  [#2]   COMMIT the test alone, before any implementation.  [#3]
+INNER  (TDD — only if `Inner loop (TDD)` is `required`)  unit → minimal code → unit green (repeat).
+       COMMIT the implementation separately from the test.  [#3]
+       When `skipped`: minimal implementation to make the OUTER test green — no inner loop; other guards hold.
+CLOSE  inner units green (n/a if skipped) AND outer green AND phase DoD items pass (profile test command)
+       AND a CLEAN re-run with assertions unchanged-or-stronger vs the RED snapshot.  [#4]  Refactor while green.
+POST   LAND per merge policy (auto-merge → done | human-review → in-review + PR URL).  [#5]
+       Update PROGRESS worklog + next issue. subagent: discard the worktree. Return the report.
 ```
 
-Bracketed `[#n]` map to the Integrity guards below. **Never** land / open a PR before the outer
-behaviour test is green — green unit tests with a red scenario = not done. The **scenario itself is
-never edited to pass** `[#1]`; a wrong scenario escalates (`needs-decision`), it does not get rewritten.
+Bracketed `[#n]` map to the Integrity guards. **Never** land before the outer behaviour test is green. The
+**scenario and the `Inner loop (TDD)` flag are never edited by the builder** `[#1]` — a wrong one escalates
+(`needs-decision`), it is not rewritten.
 
 ## Integrity — the test is the spec, not a target to move
 
-Reward-hacking guard. The build agent makes the **code** satisfy the test, **never the reverse**.
-Prose alone can't self-police motivation, so these are structural:
+Structural, not just prose (the full statements live in `agents/issue-worker.md`):
 
-- **The scenario is immutable to the builder.** It was authored at planning time from the phase PRD.
-  The build agent realizes it but must not weaken, delete, `xfail`, comment out, or rewrite it.
-  Wanting to change it = a spec gap → **escalate** (`needs-decision`), never edit. The issue's
-  **`Inner loop (TDD)` flag is likewise fixed at planning** — the builder honours it and must not flip
-  `required → skipped` to skip unit testing (that is drift); a flag that looks wrong escalates, never edits.
-- **Prove RED for the right reason.** Before any implementation, run the behaviour test and capture
-  the *failing* output (feature absent, not a typo). Record it. No RED proof = not a valid cycle.
-- **Two commits, test-first.** Commit the behaviour test (test-only) before the implementation commit.
-  Git history is the audit trail; a test edited with/after the code is the smell.
-- **Re-run from clean at close.** Re-run the profile's test command from a clean state: the outer test
-  must pass **and** its assertions be unchanged-or-stronger vs the RED snapshot. A weakened test fails
-  the dispatch, even if it is "green".
-- **Independent check (when enabled).** A separate verifier (hook and/or verifier agent — see the
-  profile) re-reads the **branch diff** (the PR under `human-review`; the issue branch pre-merge under
-  `auto-merge`): did the test move to fit the code? Under `human-review` this runs on the PR before a
-  human merges; under `auto-merge` it must run **before the merge** (e.g. a pre-merge hook / CI check),
-  so a test-gaming diff never lands.
+- **`[#1]` Scenario + TDD flag immutable to the builder.** Fixed at planning; wanting to change = spec gap →
+  escalate.
+- **`[#2]` Prove RED for the right reason** before any implementation.
+- **`[#3]` Two commits, test-first.** Behaviour test committed before implementation.
+- **`[#4]` Re-run from clean at close.** A weakened-but-green test fails the dispatch.
+- **`[#5]` Independent check (when `integrity: +hook`/`+verifier`).** The `PreToolUse` hook denies an
+  implementation edit before a test is committed on the branch (test-first, universal — BDD outer is always
+  required); a verifier agent can re-read the branch/PR diff for test-gaming before the merge.
+
+## Escalation — the orchestrator handles what a leaf can't
+
+A subagent has **no interactive back-channel**: it cannot pause and ask mid-flight. So it **returns and the
+orchestrator resolves**:
+
+- **`needs-decision`** (structural/critical decision no baseline covers): the worker returns the exact
+  question and terminates. The orchestrator runs **`/grill-me`** with the **engineer** (technical) or
+  **stakeholder** (scope), records the resolution as a new **ADR** (`docs/adrs/`) + `ARCHITECTURE.md` update
+  or a **PRD amendment**, then **re-dispatches the worker** with the decision now in the baselines (and in
+  the pack). The orchestrator **never resolves a structural decision from its own context** — that is
+  silent drift; structural always goes to the human.
+- **`blocked`** (missing fixture / unclear boundary / dependency not landed): the branch stays quarantined
+  (`doing`, never lands); surface it. Do not fake green.
+- **`needs-revalidation`** (a gap in an *existing* baseline): flow up — `PRD.md` → stakeholders,
+  `ARCHITECTURE.md`/ADR → devs.
+
+Existing files a worker merely *lacks in context* are **not** escalations — it reads them itself.
 
 ## Report-back contract (what a dispatch returns)
 
-Whether via subagent message or the session's own summary, every dispatch yields:
-
-- **Outcome:** `green` (landed `done` under auto-merge, or PR open `in-review` under human-review) |
-  `blocked` | `needs-decision` | `needs-revalidation`.
-- **Scenario status:** outer behaviour test pass/fail; inner test count (`n/a` when the issue's `Inner loop (TDD)` is `skipped`).
-- **Changes:** files/models touched (paths), test command output (the green proof), and the **merge/PR
-  ref** (merge commit under auto-merge; PR URL under human-review).
-- **PROGRESS delta:** the worklog line + the next issue.
-- **Escalations:** any structural gap to flow up (see failure handling).
+- **Outcome:** `green` (landed `done` / PR `in-review`) | `blocked` | `needs-decision` | `needs-revalidation`.
+- **Scenario status:** outer pass/fail; inner test count (`n/a` when `skipped`).
+- **Changes:** files touched, test-command output (green proof), merge/PR ref.
+- **PROGRESS delta:** worklog line + next issue.
 
 The orchestrator **relays what matters** to the user (a subagent's final message is not user-visible).
 
 ## Idempotency & resume
 
-State lives in **files**, never in agent memory: the backlog status
-(`todo`/`doing`/`in-review`†/`done`) + `PROGRESS.md` are the single source of truth (†`in-review` only
-under human-review). A crashed or interrupted dispatch is recovered by:
+State lives in **files**, never in agent memory: backlog status (`todo`/`doing`/`in-review`/`done`) +
+`PROGRESS.md` are the single source of truth. Recovery after a crash/compaction:
 
-1. Reconcile: any `in-review`/`doing` issue already landed in the integration branch → `done`.
-2. Read the backlog: any issue stuck in `doing` is the one to resume — its `issue/<id>-…` branch
-   already exists, so switch/attach to it rather than re-branching.
-3. Re-run the per-issue procedure from PRE, but **continue from actual git/test state**: if the branch
-   already has commits, run the test command to read current red/green and pick up there — do **not**
-   demand a fresh RED (the feature may be partly built). Re-writing an existing test / re-landing a
-   landed branch is a no-op; the loop is safe to replay.
+1. **Reconcile:** any `in-review`/`doing` issue already landed → `done`.
+2. **Resume:** an issue stuck in `doing` is the one to resume — its `issue/<id>-…` branch exists, so
+   attach to it rather than re-branching.
+3. **Continue from actual git/test state:** if the branch already has commits, run the test command to read
+   red/green and pick up there — do **not** demand a fresh RED. Re-landing a landed branch is a no-op.
 
-Because dispatch is atomic (one issue, one branch, marked `doing`→`done`/`in-review` around it), replay
-never double-lands or double-opens a PR.
+Because a dispatch is atomic (one issue, marked `doing`→`done`/`in-review`), replay never double-lands.
 
-## Failure handling (no silent failure)
+## The gate (after every dispatch)
 
-- **`blocked`** (missing fixture, unclear boundary, dependency not landed): stop, record the blocker
-  in `PROGRESS.md` under Open questions, leave the issue `doing` (it does not land — the branch stays
-  quarantined), surface it. Do not fake green.
-- **`needs-decision`** (a technical/behaviour/architecture decision is required to proceed and **no
-  PRD/ARCHITECTURE/ADR covers it**, and it is structural/critical/hard-to-reverse): **stop — do not
-  invent it.** Run `/grill-me` to validate that single decision with the **engineer** (technical) or
-  **stakeholder** (scope), then record the resolution as a new **ADR** (`docs/adrs/`) + `ARCHITECTURE.md`
-  update, or a **PRD amendment**; resume. Tactical, reversible micro-decisions are NOT this — make them
-  and log them in `PROGRESS.md`.
-- **`needs-revalidation`** (the issue reveals a scope/architecture gap in an *existing* baseline):
-  stop, flow it **up** — `PRD.md` gap → stakeholders, `ARCHITECTURE.md`/ADR gap → devs. The loop does
-  not silently amend a baseline.
+- **Mid-work overflow** — the `PreCompact` hook fires (deterministic), position is flushed to `PROGRESS.md`,
+  compaction happens, the `SessionStart` hook re-injects state, the loop continues. No hand-authored handoff
+  is required for correctness — files + re-prime reconstruct position (the `/handoff` skill remains an
+  optional richer checkpoint you can still write).
+- **Clean boundary** (phase drained / project complete) — nothing mid-flight; `PROGRESS.md` + backlog + git
+  describe it fully. A fresh tick re-primes and PLANs the next phase, or stops if the project is done. (Under
+  `human-review`, a phase boundary with open PRs is `awaiting-review`: pause and surface.)
 
-## Gate (after every dispatch)
+## Loop termination (it is finite)
 
-Two kinds of stop, and they checkpoint **differently**:
+One iteration = one issue → a phase's loop is bounded by its backlog size; the project = the sum of the
+phases' backlogs + one PLAN per phase. Stop when: **phase drained** → PLAN next or (all IDs+DoD done)
+**project complete**; **awaiting-review** (human-review PRs blocking dependents); **`blocked` /
+`needs-decision` / `needs-revalidation`** (the only unplanned stops).
 
-- **Mid-work cut (context ~40%, issues still left in the phase)** — work is in flight. Run **`/handoff`**
-  (OS temp) to capture what is mid-doing, record its path atop `PROGRESS.md`, then continue per the
-  handoff mode. **The `/handoff` is required** — the next context needs the volatile "where I was" that
-  files alone don't hold.
-- **Clean boundary (phase drained — all issues `done`/merged — or project complete)** — nothing is
-  mid-flight; `PROGRESS.md` + backlog + git already describe the boundary in full. **Skip the
-  `/handoff`** — the next context reconstructs from files alone. (Under `human-review`, a phase boundary
-  with open PRs is instead `awaiting-review`: pause and surface, do not respawn.)
+## Continuation drivers (host-agnostic)
 
-Then continue per the profile's **handoff mode**: `auto` self-continues via the flat supervisor below (no
-human); `manual` tells the user to start a clean session. Either way the next context (subagent, new
-session, or compaction) re-primes, reconciles merged PRs (human-review), and continues at the next `todo`
-whose blockers are landed — or, at a drained phase, at **PLAN for the next phase**.
-
-## Autonomous handoff — the flat supervisor (`handoff: auto`)
-
-`auto` makes the context gate a checkpoint with **no human**, using one structural trick: a **flat
-supervisor** spawns **sequential worker subagents**, where *the workers hold all the context and hit the
-gate, and the supervisor holds almost none*. The workers are where context accumulates; the supervisor
-only respawns them. This trick exists **solely** to make the handoff autonomous — nothing else changes.
-
-**Two roles, strictly separated:**
-
-- **Supervisor (root session — must hold ~zero context).** Its entire job: spawn a worker → receive one
-  compact status line → spawn the next worker. It **must not** read the PRD, ARCHITECTURE, backlog,
-  issues, code, or diffs into its own context — it passes **file paths, never file contents**, and
-  relays only the worker's status line. Holding no domain context is what keeps it flat, so it can
-  sequence unboundedly many workers. If the supervisor ever needs a fact, it points a worker at the
-  file; it does not read it itself.
-- **Worker (a fresh subagent per context budget — holds everything).** Primes from files + the latest
-  handoff, then runs the loop — `PLAN` a phase if the files say one is due, then dispatch its issues — for
-  **as many steps as fit**, until either it trips its own ~40% gate **or it drains the phase**. On a
-  **~40% mid-work cut** it **authors its own `/handoff`** (it alone holds the mid-doing context) before
-  returning; on a **clean phase drain** it writes no handoff (files fully describe the boundary) and
-  leaves `PLAN` of the next phase to the next worker — that keeps the next phase's context out of the
-  dying worker. Either way it updates `PROGRESS.md` + backlog and **returns a compact status**, then
-  terminates. All heavy reading/writing/testing lives here.
-
-**The cycle:**
-
-```
-supervisor:  loop
-               spawn Worker(pack = {profile path, PROGRESS path, latest-handoff path})   # paths only
-                 └─ Worker: prime → dispatch until ~40% OR phase drains → (/handoff only if mid-work) → update files → return status
-               read the one-line status
-               if terminal (project-complete / awaiting-review / backlog-review) or escalation → stop, surface to user
-               else → spawn the NEXT Worker (fresh context)          # sequential — never nested
-```
-
-**Invariants (what makes the trick sound):**
-
-- **Sequential, never nested.** One worker at a time; the supervisor waits for a worker to return before
-  spawning the next. A worker **never spawns its own successor** — that would nest context and defeat the
-  flatness. Respawning is the supervisor's job alone.
-- **All context lives in the worker; the supervisor stays empty.** The supervisor never accumulates
-  domain context — that is the whole point.
-- **Files are the truth; the status line is only control flow.** A worker's durable outputs are the
-  commits/PRs, `PROGRESS.md`, the backlog statuses, and the handoff doc. Even if a worker dies before
-  writing a handoff, the next worker recovers from files alone (see *Idempotency & resume*) — the
-  handoff is an optimization, not the guarantee.
-- **Requires subagent support.** Without it, fall back to `handoff: manual`.
-
-**Worker status line (the only thing that crosses back up):** `outcome` (continuing | project-complete |
-awaiting-review | backlog-review | blocked | needs-decision | needs-revalidation) · next `todo` issue id ·
-latest handoff path. Nothing else — no diffs, no code, no PRD prose. Keep it one line so the supervisor
-stays flat.
-
-Under `backlog-review: confirm` the worker cuts the phase backlog, then returns `backlog-review` and
-stops — a headless worker can't collect the human's approval, so the supervisor surfaces the backlog and
-waits for the human to approve/edit before the next worker starts building.
+Re-enter the orchestrator with whichever the host offers: **`/loop`** (self-paced — each tick re-primes and
+does the next issue, the default and recommended driver now that handoff is hook-driven); a **`/schedule` /
+cron watchdog** running `/sdd` (also the unattended crash-recovery mechanism); or a plain human
+re-invocation of `/sdd`. Every tick re-reads files, reconciles landings, and continues from the true next
+`todo` — that files-are-truth reconcile is what makes any driver safe.

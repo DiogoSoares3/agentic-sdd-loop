@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Agentic Spec-Driven Development methodology for code assistants: a PRD/ARCHITECTURE-driven build loop, packaged as a reusable plugin.",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "plugins": [
     {
       "name": "sdd-loop",
       "source": "./plugins/sdd-loop",
-      "description": "SDD outer loop + BDD/TDD double inner loop, driven from a stakeholder-validated PRD.md and a dev-validated ARCHITECTURE.md. Bootstrap with /sdd-init; orchestrates /to-prd, /to-issues, /bdd, /tdd, /grill-me, /handoff and /loop via a per-issue dispatcher. Project-agnostic: each repo supplies a .sdd/profile.md."
+      "description": "SDD outer loop + BDD/TDD double inner loop, driven from a stakeholder-validated PRD.md and a dev-validated ARCHITECTURE.md. A main-session orchestrator dispatches bounded subagents (sdd-phase-opener, sdd-issue-worker) and ships deterministic hooks (SessionStart re-prime, PreCompact handoff, PreToolUse test-first). Bootstrap with /sdd-init; orchestrates /to-prd, /to-issues, /bdd, /tdd, /grill-me, /handoff and /loop. Project-agnostic: each repo supplies a .sdd/profile.md."
     }
   ]
 }
