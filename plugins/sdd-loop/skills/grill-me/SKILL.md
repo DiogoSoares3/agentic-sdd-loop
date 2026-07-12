@@ -26,8 +26,12 @@ from the template once the interview is done (item 2 below).
    equal-weight validated baselines. So keep decisions **minimally in accordance with the PRD**: a
    seam/decision should trace to the FR/NFR it serves or the régua it satisfies. Don't force it — this is a
    sanity check, not a gate; a decision that answers no requirement is *likely* gold-plating, one that
-   conflicts is a `needs-revalidation` back to the stakeholder. Interview the engineer for the technical
-   truth — the **seams** (highest, fewest), the **test mechanism**, components, the key decisions, and the
+   conflicts is a `needs-revalidation` back to the stakeholder. For an existing repo, **start by exploring
+   the codebase** — its current structure, key modules, and where behaviour is already intercepted — so
+   every proposal (decisions, seams, folder layout) is grounded in what's actually there, not invented in a
+   vacuum; for a greenfield repo there's little to read, so propose from the PRD + régua. Interview the
+   engineer for the technical truth — the **seams** (highest, fewest), the **test mechanism**, components,
+   the key decisions, and the
    **repository/directory/script structure** (map an existing layout and sanity-check it makes sense, or
    propose one for a fresh repo — the shape of the codebase is part of the architecture, so **validate it
    with the user**). Ask enough to **draw the diagrams the template wants**: the components/layers and their
