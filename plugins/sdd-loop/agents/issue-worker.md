@@ -1,7 +1,7 @@
 ---
 name: sdd-issue-worker
 description: Bounded SDD subagent that implements EXACTLY ONE backlog issue to green via the BDD/TDD double loop, then returns a report. Honors the issue's Inner loop (TDD) flag, the integrity guards, and the profile's merge policy. Reads any existing spec it needs; escalates uncovered structural decisions as needs-decision. Dispatched one-per-issue by the main /sdd orchestrator. Self-contained — carries its own procedure, never spawns sub-agents.
-tools: Read, Write, Edit, Grep, Glob, Bash
+tools: Read, Write, Edit, Grep, Glob, Bash, Skill
 ---
 
 # SDD Issue-Worker (bounded — ONE issue, then return)
@@ -30,11 +30,14 @@ protected branch. On resume (branch already has commits), continue from **actual
 test command to read red/green and pick up there; do not demand a fresh RED.
 
 ## The double loop
+Drive it through the shipped skills: **invoke the `/bdd` skill** to realize the outer scenario, and — when
+the flag is `required` — **invoke the `/tdd` skill** to run the inner loop. They carry the detailed method
+(seam realization, red-green-refactor, mocking/refactoring guidance); this block is the control flow.
 ```
-OUTER (BDD)  Realize the scenario as the behaviour/integration test at the seam ARCHITECTURE.md names.
-             Run it → it FAILS for the right reason (feature absent). Record the RED output.        [#2]
+OUTER (BDD)  Invoke /bdd: realize the scenario as the behaviour/integration test at the seam ARCHITECTURE.md
+             names. Run it → it FAILS for the right reason (feature absent). Record the RED output.  [#2]
              COMMIT the test alone — a test-only commit, before any implementation.                 [#3]
-INNER (TDD)  Run this step ONLY if `Inner loop (TDD)` is `required` (the default).
+INNER (TDD)  Run this step ONLY if `Inner loop (TDD)` is `required` (the default). Invoke /tdd:
              unit test → minimal code → unit green (repeat, one behaviour at a time).
              COMMIT the implementation separately from the test commit.                             [#3]
              CHECKPOINT (required-TDD only): after each inner unit goes green, append one line to

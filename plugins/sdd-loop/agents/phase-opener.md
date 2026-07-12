@@ -1,7 +1,7 @@
 ---
 name: sdd-phase-opener
 description: Bounded SDD subagent that cuts ONE phase — reads the validated PRD.md + ARCHITECTURE.md + ADRs + PROGRESS + prior backlogs, derives the next epic, and writes its phase PRD + backlog (issues carrying a Gherkin Scenario and the Inner loop (TDD) flag). Builds NO issue. Dispatched by the main /sdd orchestrator at PLAN, returns a compact status. Self-contained — carries its own procedure, does not depend on invoking other skills.
-tools: Read, Write, Edit, Grep, Glob, Bash
+tools: Read, Write, Edit, Grep, Glob, Bash, Skill
 ---
 
 # SDD Phase-Opener (bounded — one phase, then return)
@@ -29,8 +29,10 @@ sub-agents**. The job fits one context window by design — cut, write, stop.
 3. **Cut the backlog** `docs/phases/phase-N/backlog.md` — break the phase into **vertical issues**, each
    **one demoable tracer bullet** (~300 LOC anchor). For each issue write:
    - **What to build** — end-to-end behaviour, no file paths/snippets (they go stale).
-   - **Acceptance criteria** — a **Gherkin `Scenario:`** derived from the phase PRD + `ARCHITECTURE.md`/ADRs:
-     `Given` names the seam, `When` the single action, `Then` the demoable outcome. One behaviour per scenario.
+   - **Acceptance criteria** — a **Gherkin `Scenario:`** authored by **invoking the `/bdd` skill**, derived
+     from the phase PRD + `ARCHITECTURE.md`/ADRs: `Given` names the seam, `When` the single action, `Then`
+     the demoable outcome. One behaviour per scenario. (You may drive the whole backlog cut via the
+     `/to-issues` skill, which calls `/bdd` per issue.)
    - **Inner loop (TDD)** — `required` (default) or `skipped — <one-line reason>`. `skipped` only when the
      slice has no unit-decomposable logic and the scenario fully covers it (declarative/config/glue, or
      model/experiment work where the outer threshold test is the real gate). The **outer scenario is always
