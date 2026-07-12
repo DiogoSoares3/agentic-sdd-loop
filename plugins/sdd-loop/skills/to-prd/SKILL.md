@@ -8,7 +8,7 @@ This skill takes the current conversation context and codebase understanding and
 
 ## Process
 
-1. Explore the repo to understand the current state of the codebase, if you haven't already. Use the project's domain glossary vocabulary throughout the PRD, and respect any ADRs in the area you're touching.
+1. Explore the repo to understand the current state of the codebase, if you haven't already — **including any documentation already present** (README, `docs/`, design notes, an existing partial PRD/spec) to ground the PRD in what's there, not a blank page. Use the project's domain glossary vocabulary throughout the PRD, and respect any ADRs in the area you're touching.
 
 2. **(Standalone use only — skip this step inside the SDD loop.)** Sketch out the seams at which you're going to test the feature. Existing seams should be preferred to new ones. Use the highest seam possible. If new seams are needed, propose them at the highest point you can. The fewer seams across the codebase, the better - the ideal number is one. Check with the user that these seams match their expectations.
 
@@ -22,7 +22,7 @@ This skill takes the current conversation context and codebase understanding and
 
    **This skill writes the root/whole-product PRD** (SDD root, or standalone use) — synthesis from the conversation + codebase, optionally after `/grill-me`, flagged for **human validation**. It does **not** write **phase** PRDs: a phase PRD is a deterministic **projection** of the already-validated baselines into `templates/prd/phase-PRD.template.md`, written by the SDD loop's PLAN step — there is no conversation to synthesize there, so it does not route through this skill.
 
-   Write to the path from the argument; otherwise default under `docs/`. Do not publish to any issue tracker and do not apply labels.
+   Write to the profile's configured **PRD path** (its *Sources of truth* / *Baselines* location — the same file `/sdd-init` scaffolded, which a project may have relocated out of `docs/`), or to a path passed as an argument. Fall back to `docs/PRD.md` only in standalone use with no profile. Never hardcode `docs/` when a profile says otherwise. Do not publish to any issue tracker and do not apply labels.
 
 **Fallback template — standalone use only. The SDD loop uses the profile's template instead (it splits
 the technical "how" out into `ARCHITECTURE.md`); this generic one folds "how" and "what" together.**

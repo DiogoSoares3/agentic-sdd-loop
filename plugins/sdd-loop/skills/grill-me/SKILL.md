@@ -16,6 +16,11 @@ question, then hand the result to the writer skill (`/to-prd` for the PRD) — g
 The **one exception** is `ARCHITECTURE.md`: it has no separate writer skill, so grill-me writes it directly
 from the template once the interview is done (item 2 below).
 
+**Ground before you grill.** First sweep the repo for material that already exists — a README, a `docs/`
+folder, design notes, an existing partial PRD/spec, ADRs, even rich code comments — and read it, so you
+interview from a base rather than a blank page. Absorb and reconcile what's there; don't restate it. (A fresh
+repo may have nothing — then grill from the PRD + régua.)
+
 1. **Author a missing `PRD.md` (with the stakeholder).** The repo has no product truth to synthesize.
    Interview the stakeholder down the tree — problem, **personas and each persona's user stories**, scope
    of v1, requirements, definition of done, out-of-scope — then hand off to **`/to-prd`** to write `PRD.md`
