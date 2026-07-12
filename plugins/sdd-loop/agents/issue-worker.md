@@ -37,7 +37,7 @@ Drive it through the shipped skills: **invoke the `/bdd` skill** to realize the 
 the flag is `required` — **invoke the `/tdd` skill** to run the inner loop. They carry the detailed method
 (seam realization, red-green-refactor, mocking/refactoring guidance); this block is the control flow.
 ```
-OUTER (BDD)  Invoke /bdd: realize the scenario as the behaviour/integration test at the seam ARCHITECTURE.md
+OUTER (BDD)  Invoke /bdd: realize the scenario as the behaviour test at the seam ARCHITECTURE.md
              names. Run it → it FAILS for the right reason (feature absent). Record the RED output.  [#2]
              COMMIT the test alone — a test-only commit, before any implementation.                 [#3]
 INNER (TDD)  Run this step ONLY if `Inner loop (TDD)` is `required` (the default). Invoke /tdd:

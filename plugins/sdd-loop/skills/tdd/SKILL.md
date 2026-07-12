@@ -8,7 +8,7 @@ description: Test-driven development with red-green-refactor loop. Use when user
 ## Double loop (when driven by `/sdd` + `/bdd`)
 
 TDD here is the **inner** loop of a double loop. The **outer** loop is the issue's Gherkin scenario,
-realized by `/bdd` as a failing behaviour/integration test *before* you start. Then:
+realized by `/bdd` as a failing behaviour test *before* you start. Then:
 
 ```
 OUTER (BDD):  behaviour test from the scenario → red

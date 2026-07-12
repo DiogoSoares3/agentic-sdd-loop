@@ -149,8 +149,8 @@ subagents). Every issue is built on **its own branch off the integration branch
   `docs/phases/phase-N/prd.md` + `ARCHITECTURE.md`/relevant ADRs + **the one issue's scenario + its
   `Inner loop (TDD)` flag**. Not the whole PRD, not the backlog. The worker reads any other **existing**
   spec file itself; the orchestrator is not a file server.
-- **Double loop inside the dispatch:** `/bdd` realizes the scenario as the failing behaviour/
-  integration test (outer red) → then, **only when the issue's `Inner loop (TDD)` flag is `required`**
+- **Double loop inside the dispatch:** `/bdd` realizes the scenario as the failing behaviour test
+  (outer red) → then, **only when the issue's `Inner loop (TDD)` flag is `required`**
   (default), `/tdd` runs the inner loop (unit → code → unit green); when it is **`skipped`** the minimal
   implementation makes the outer test green with no inner loop. Done only when the outer behaviour test —
   **and** the inner units, if the inner loop ran — are green **and** the phase DoD items it touches pass

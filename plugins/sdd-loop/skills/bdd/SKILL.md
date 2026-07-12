@@ -1,6 +1,6 @@
 ---
 name: bdd
-description: Author and realize Gherkin acceptance scenarios for vertical issues, always derived from the phase PRD and ARCHITECTURE.md/ADRs. Use when writing an issue's acceptance criteria (with /to-issues) or when writing the behaviour/integration test at the start of a slice (the outer loop before /tdd). Mentions "bdd", "gherkin", "given/when/then", "acceptance scenario".
+description: Author and realize Gherkin acceptance scenarios for vertical issues, always derived from the phase PRD and ARCHITECTURE.md/ADRs. Use when writing an issue's acceptance criteria (with /to-issues) or the outer behaviour test — commonly an integration test — at the start of a slice (before /tdd). Mentions "bdd", "gherkin", "given/when/then", "acceptance scenario".
 ---
 
 # BDD — behaviour scenarios, derived from the specs
