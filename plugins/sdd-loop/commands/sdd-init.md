@@ -16,7 +16,11 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
    sensible profile defaults in step 3, never as a behaviour switch, so infer whatever describes the repo.
    State your guess; ask only if ambiguous.
 
-2. **Create the files** if they do not already exist (never clobber existing ones — report and skip):
+2. **Create the files** if they do not already exist (never clobber existing ones — report and skip).
+   The locations below follow the profile's **Paths** + **Sources of truth** slots. If the user wants the
+   baselines / `PROGRESS.md` / phases dir **anywhere other than `docs/`**, confirm those path slots **first**
+   (jump to step 3's Paths / Sources-of-truth questions) and create the files at the chosen locations —
+   every downstream agent, skill, and hook reads these locations from the profile, so they must agree.
    - `.sdd/profile.md` — from `${CLAUDE_PLUGIN_ROOT}/templates/profile.template.md`.
    - `docs/PROGRESS.md` (the profile's durable-state path) — from `${CLAUDE_PLUGIN_ROOT}/templates/PROGRESS.template.md`.
    - `docs/PRD.md` skeleton — from `${CLAUDE_PLUGIN_ROOT}/templates/prd/PRD.template.md`, marked
@@ -26,7 +30,22 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
    In each created file, replace the `<PROJECT NAME>` title placeholder with the repo's real project name
    (an unfilled `<…>` token trips `/sdd`'s profile gate).
 
-3. **Fill the profile slots** by interviewing the user briefly (one question at a time). The slots:
+3. **Fill the profile slots** by interviewing the user briefly (one question at a time).
+
+   > **Signal the consequential slots — don't let the user skim past these four.** Most slots have safe
+   > defaults, but four carry outsized consequence:
+   > - **Paths** *(most important)* — where `PRD.md` / `ARCHITECTURE.md` / `PROGRESS.md` / the phases dir
+   >   live. **Everything downstream — the agents, the skills, and the `SessionStart` re-prime + `SubagentStop`
+   >   verify hooks — reads these locations from the profile.** If the user wants the main `.md` files outside
+   >   `docs/`, set this here (and create the files there in step 2). Keep every path in backticks so the hooks
+   >   can parse it (the re-prime reads the **Durable state** line; the verify guard reads the **Phases dir** line).
+   > - **Git strategy** — protected/integration branch, PR provider, merge policy; wrong values land code on the
+   >   wrong branch or stall the loop.
+   > - **Continuation mode + Backlog review** *(the loop knobs)* — whether the loop pauses for a human at a
+   >   boundary / after planning, i.e. supervised vs unattended.
+   > - **Integrity enforcement** — the test-first guard level.
+
+   The slots:
    - **Régua** — the single dominant constraint that filters every decision.
    - **Sources of truth** — paths + who validates each (`PRD.md` → stakeholders, `ARCHITECTURE.md` → devs).
    - **Spec gate** — what must be true to leave SPEC and start building (default: `PRD.md` validated with

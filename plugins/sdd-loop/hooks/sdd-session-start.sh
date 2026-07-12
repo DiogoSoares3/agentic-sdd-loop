@@ -17,7 +17,11 @@ ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
 PROFILE="$ROOT/.sdd/profile.md"
 [ -f "$PROFILE" ] || exit 0
 
-PROGRESS="$ROOT/docs/PROGRESS.md"
+# Durable-state path is read from the profile's Paths section (the first backtick-quoted token on the
+# "Durable state" line), so a project can relocate PROGRESS.md out of docs/. Falls back to the default.
+prof_path() { { grep -iE "$1" "$PROFILE" 2>/dev/null | head -n1 | grep -oE '`[^`]+`' | head -n1 | tr -d '`'; } || true; }
+PROGRESS_REL="$(prof_path 'Durable state')"; : "${PROGRESS_REL:=docs/PROGRESS.md}"
+case "$PROGRESS_REL" in /*) PROGRESS="$PROGRESS_REL";; *) PROGRESS="$ROOT/$PROGRESS_REL";; esac
 
 # --- Extract the SDD-CURSOR block + its four fields (robust: fixed markers, fixed keys). ---
 cur_field() { printf '%s\n' "$CURSOR" | grep -iE "^- $1:" | head -n1 | sed -E "s/^- $1:[[:space:]]*//I"; }

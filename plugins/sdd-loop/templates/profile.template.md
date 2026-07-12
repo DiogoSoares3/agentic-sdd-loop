@@ -101,6 +101,10 @@ The exact command(s) that prove a slice green.
 - **Backlog statuses:** `todo → doing → done` (auto-merge) · `todo → doing → in-review → done` (human-review).
 
 ## Paths
+> **Load-bearing — every downstream tool + hook reads artifact locations from here.** Relocate the baselines /
+> `PROGRESS.md` / phases dir by editing the paths below; **keep each path in backticks** so the hooks can parse
+> it. The `SessionStart` re-prime reads the **Durable state** path; the `SubagentStop` verify reads the
+> **Phases dir** path (both fall back to `docs/…` if unset).
 - **Phases dir:** `docs/phases/` — each epic gets `docs/phases/phase-N/` holding **`prd.md`** (the phase
   projection) and **`backlog.md`** (that phase's issues). Deterministic dir name `phase-N` (N = phase
   number); the epic's human name lives in the `prd.md` H1.

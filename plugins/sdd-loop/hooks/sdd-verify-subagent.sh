@@ -55,7 +55,11 @@ block() {  # $1 = reason shown in the subagent's transcript
 # ---- sdd-phase-opener: claims a phase opened -> a non-empty backlog must exist. ----
 case "$AGENT" in
   *sdd-phase-opener)
-    PH_DIR="$ROOT/docs/phases"
+    # Phases dir is read from the profile's Paths section (first backtick-quoted token on the
+    # "Phases dir" line), so a project can relocate it out of docs/. Falls back to the default.
+    prof_path() { { grep -iE "$1" "$PROFILE" 2>/dev/null | head -n1 | grep -oE '`[^`]+`' | head -n1 | tr -d '`'; } || true; }
+    PHASES_REL="$(prof_path 'Phases dir')"; : "${PHASES_REL:=docs/phases}"; PHASES_REL="${PHASES_REL%/}"
+    case "$PHASES_REL" in /*) PH_DIR="$PHASES_REL";; *) PH_DIR="$ROOT/$PHASES_REL";; esac
     [ -d "$PH_DIR" ] || exit 0                   # nonstandard/absent path -> fail-open
     NEWEST="$(ls -t "$PH_DIR"/*/backlog.md 2>/dev/null | head -n1 || true)"
     if [ -z "$NEWEST" ] || [ ! -s "$NEWEST" ]; then
