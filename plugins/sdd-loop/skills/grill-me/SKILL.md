@@ -31,10 +31,12 @@ from the template once the interview is done (item 2 below).
    Ask enough to **draw the diagrams the template wants**: the components/layers and their **edges**
    (who calls/depends on whom, direction of data flow), the external actors + data stores, **which
    boundaries are the seams**, and the régua's **hot path**. Then write `ARCHITECTURE.md` — rendering the
-   container-and-seams **Mermaid** diagram (+ optional hot-path) from those answers — and **record each
-   closed decision as an ADR as it surfaces** (`docs/adrs/` from `adr.template.md`, naming the discarded
-   alternative): grill-me captures the ADRs *while* building the architecture, not as an afterthought. It
-   needs **engineer validation**.
+   container-and-seams **Mermaid** diagram (+ optional hot-path) from those answers. As decisions land,
+   stay aware that **a weighty one — a real fork, hard-to-reverse, or a stakeholder/engineer call others
+   will inherit — may be worth capturing as an ADR right then** (`docs/adrs/` from `adr.template.md`, naming
+   the discarded alternative), *while* building the architecture rather than only after. **Nothing forces an
+   ADR per decision** — it's a judgment call on what a future agent will need to know. It needs **engineer
+   validation**.
 3. **Validate one escalated `needs-decision` (with the engineer).** The loop stopped on a structural /
    critical / hard-to-reverse call no baseline covers. Grill **one decision only**, with the **engineer**
    for a technical/architecture/behaviour call (or the **stakeholder** for scope). Record the resolution

@@ -8,8 +8,9 @@
 ## Context
 The decision and what forced it. If the loop raised it as `needs-decision`, say **why the baselines didn't
 cover it** (what the phase PRD / `ARCHITECTURE.md` were silent on); if it closed while authoring a baseline,
-just the forcing question. Either way, name the **PRD requirement/constraint it ultimately serves** (an
-`FR`/`NFR` or the régua) so even a technical call stays anchored to product truth. Keep it tight.
+just the forcing question. If it clearly serves a specific PRD requirement/constraint (an `FR`/`NFR` or the
+régua), noting that helps — but **not every ADR maps to one, and that's fine; don't invent a link**. Keep it
+tight.
 
 ## Decision
 What we chose. One or two sentences.
