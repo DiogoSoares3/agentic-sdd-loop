@@ -17,9 +17,10 @@ The **one exception** is `ARCHITECTURE.md`: it has no separate writer skill, so 
 from the template once the interview is done (item 2 below).
 
 1. **Author a missing `PRD.md` (with the stakeholder).** The repo has no product truth to synthesize.
-   Interview the stakeholder down the tree — problem, users, scope of v1, requirements, definition of
-   done, out-of-scope — then hand off to **`/to-prd`** to write `PRD.md`. It still needs **stakeholder
-   validation** before the spec gate opens.
+   Interview the stakeholder down the tree — problem, **personas and each persona's user stories**, scope
+   of v1, requirements, definition of done, out-of-scope — then hand off to **`/to-prd`** to write `PRD.md`
+   (which fills the **Personas & user stories** section, every persona with at least one story). It still
+   needs **stakeholder validation** before the spec gate opens.
 2. **Author a missing `ARCHITECTURE.md` (with the engineer).** Interview the engineer for the technical
    truth — the **seams** (highest, fewest), the **test mechanism**, components, and the key decisions.
    Ask enough to **draw the diagrams the template wants**: the components/layers and their **edges**

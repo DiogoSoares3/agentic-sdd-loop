@@ -11,6 +11,20 @@ The problem from the user's / stakeholder's perspective. Short and concrete.
 ## Solution
 The approach, from the perspective of whoever uses the result. Short.
 
+## Personas & user stories
+Who the product serves and what each needs from it — the human layer the scope below is negotiated for.
+**One sub-list per persona**, and **every persona carries at least one story** (never leave a persona
+storyless). Write each story as "**As a** <persona>, **I want** <capability>, **so that** <benefit>", at
+product altitude (a need, not a UI detail). Anchor each story to the requirement ID(s) that realize it, so
+personas → scope → requirements stay one connected chain.
+
+### <Persona name> — <one-line role / context / primary goal>
+- As a <persona>, I want <capability>, so that <benefit>. → `FR-1`, `FR-3`
+- …
+
+### <Persona name> — …
+- …
+
 ## Scope & prioritization (MoSCoW)
 The **stakeholder-negotiated scope contract** — what they validate and sign off. Every capability sits in
 exactly one priority bucket. **Won't (this version)** *is* the out-of-scope list — there is no separate
@@ -18,7 +32,7 @@ exactly one priority bucket. **Won't (this version)** *is* the out-of-scope list
 
 | Priority | Capability | Requirements |
 |---|---|---|
-| **Must** | <capability — "as an <actor> I want …" is fine> | FR-1, NFR-2 |
+| **Must** | <capability — the persona need it delivers (see *Personas & user stories*)> | FR-1, NFR-2 |
 | **Should** | … | FR-3 |
 | **Could** | … | FR-4 |
 | **Won't (this version)** | <deferred / explicit non-goal> | — |

@@ -18,6 +18,8 @@ This skill takes the current conversation context and codebase understanding and
 
    **Inside the SDD loop the profile template wins**, because it (a) prioritizes scope with a **MoSCoW** table for stakeholders to sign off and numbers requirements `FR-n`/`NFR-n` so phases and DoD can anchor to IDs, and (b) deliberately omits the technical "how" — implementation, schema, API contracts, testing decisions/seams — since that is `ARCHITECTURE.md`'s job, not the PRD's. Do **not** pull those into an SDD PRD.
 
+   **Fill every section the template asks for — do not leave a heading with only its placeholder.** In particular, populate **Personas & user stories** from the conversation: name each persona and give it **at least one** story in "As a <persona>, I want <capability>, so that <benefit>" form, anchored to the `FR`/`NFR` ID(s) it motivates. A persona with no stories is an incomplete PRD.
+
    **This skill writes the root/whole-product PRD** (SDD root, or standalone use) — synthesis from the conversation + codebase, optionally after `/grill-me`, flagged for **human validation**. It does **not** write **phase** PRDs: a phase PRD is a deterministic **projection** of the already-validated baselines into `templates/prd/phase-PRD.template.md`, written by the SDD loop's PLAN step — there is no conversation to synthesize there, so it does not route through this skill.
 
    Write to the path from the argument; otherwise default under `docs/`. Do not publish to any issue tracker and do not apply labels.
