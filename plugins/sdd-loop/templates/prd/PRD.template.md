@@ -2,8 +2,7 @@
 
 > **DRAFT — awaiting stakeholder validation. Development does not start until validated.**
 > Product truth (what / why / scope / priority). The technical "how" — components, seams, test
-> mechanism — lives in `ARCHITECTURE.md`; it is referenced, not duplicated. Generic template; `/to-prd`
-> may swap a domain-specific one named in `.sdd/profile.md`.
+> mechanism — lives in `ARCHITECTURE.md`; it is referenced, not duplicated.
 
 ## Problem
 The problem from the user's / stakeholder's perspective. Short and concrete.

@@ -1,16 +1,15 @@
 # ADR-NNNN: <short title of the decision>
 
 > Status: proposed | accepted | superseded-by ADR-MMMM · Date: YYYY-MM-DD · Deciders: <who>
-> Origin: authored with `ARCHITECTURE.md` | closed during the PRD grill | a phase/issue decision |
-> a `needs-decision` escalation — resolved via `/grill-me` on YYYY-MM-DD. (ADRs accrue **wherever a
-> decision closes** along the loop, not only from escalations.)
+> Origin: where this decision came from — architecture design, product/scope work, a build-time choice,
+> or an escalated open question — decided on YYYY-MM-DD. (Record one whenever a decision closes and a
+> future reader will need to know why.)
 
 ## Context
-The decision and what forced it. If the loop raised it as `needs-decision`, say **why the baselines didn't
-cover it** (what the phase PRD / `ARCHITECTURE.md` were silent on); if it closed while authoring a baseline,
-just the forcing question. If it clearly serves a specific PRD requirement/constraint (an `FR`/`NFR` or the
-régua), noting that helps — but **not every ADR maps to one, and that's fine; don't invent a link**. Keep it
-tight.
+The decision and what forced it — say **why the existing `PRD.md` / `ARCHITECTURE.md` didn't already cover
+it** (what they were silent on). If it clearly serves a specific PRD requirement/constraint (an `FR`/`NFR`
+or the project's dominant constraint), noting that helps — but **not every ADR maps to one, and that's
+fine; don't invent a link**. Keep it tight.
 
 ## Decision
 What we chose. One or two sentences.
@@ -23,4 +22,4 @@ What we chose. One or two sentences.
 ## Consequences
 Trade-offs accepted; what this constrains or unlocks downstream; which seam/contract it fixes. Note
 the `ARCHITECTURE.md` section this updates (technical) or the `PRD.md` amendment (scope), so the
-baseline now covers what triggered the escalation.
+baseline now covers what this decision resolved.
