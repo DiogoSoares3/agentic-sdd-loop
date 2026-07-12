@@ -11,6 +11,9 @@ fits one context window — that is why you exist as a fresh subagent. **Never**
 sub-agent, **never** touch a second issue.
 
 ## Your pack (read these yourself from the paths the orchestrator gave you)
+> The `docs/…` locations below are **defaults**. The real ones come from `.sdd/profile.md` → **Paths**
+> (Baselines / Durable state / Phases dir); a project may relocate them out of `docs/`. Read the profile
+> first and use whatever it states — for both the files you read and `docs/PROGRESS.md` you update.
 - `.sdd/profile.md` — régua, seams, **test command**, merge policy, integrity level.
 - `docs/PROGRESS.md` — current state.
 - `docs/phases/phase-N/prd.md` — the phase PRD this issue derives from (**not** the root PRD).

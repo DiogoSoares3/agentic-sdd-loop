@@ -11,6 +11,9 @@ and write its structure, then **return a compact status**. You build **no** issu
 sub-agents**. The job fits one context window by design — cut, write, stop.
 
 ## Inputs (the orchestrator gives you paths; read them yourself)
+> The `docs/…` locations below are **defaults**. The real ones come from `.sdd/profile.md` → **Paths**
+> (Baselines / Durable state / Phases dir); a project may relocate them out of `docs/`. Read the profile
+> first and use whatever it states — for both the files you read and the ones you write.
 - `.sdd/profile.md` — régua, phase-cutting rule, vertical slice, paths, knobs.
 - `docs/PRD.md` (root, **validated**) — requirement IDs (`FR-n`/`NFR-n`), MoSCoW, DoD.
 - `docs/ARCHITECTURE.md` + `docs/adrs/*` — seams, dependency order, closed decisions.

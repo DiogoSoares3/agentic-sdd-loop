@@ -63,7 +63,7 @@ case "$AGENT" in
     [ -d "$PH_DIR" ] || exit 0                   # nonstandard/absent path -> fail-open
     NEWEST="$(ls -t "$PH_DIR"/*/backlog.md 2>/dev/null | head -n1 || true)"
     if [ -z "$NEWEST" ] || [ ! -s "$NEWEST" ]; then
-      block "sdd-phase-opener returned but no non-empty backlog.md exists under docs/phases/. Finish writing docs/phases/phase-N/prd.md + backlog.md (issues each with a Gherkin Scenario and an Inner loop (TDD) flag) before stopping; if a decision is missing, return needs-decision instead."
+      block "sdd-phase-opener returned but no non-empty backlog.md exists under $PHASES_REL/. Finish writing $PHASES_REL/phase-N/prd.md + backlog.md (issues each with a Gherkin Scenario and an Inner loop (TDD) flag) before stopping; if a decision is missing, return needs-decision instead."
     fi
     exit 0
     ;;

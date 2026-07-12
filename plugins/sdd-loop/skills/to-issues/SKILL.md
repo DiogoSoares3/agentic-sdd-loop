@@ -52,7 +52,7 @@ Title / Blocked by / User stories covered — and confirm granularity and depend
 
 ### 5. Record the issues in a local backlog file
 
-**Idempotent append (safe replay):** before writing, check the backlog for issues already recorded for this phase/parent and skip those — re-running after an interrupt must not duplicate. For each *new* slice, append an entry to the phase's backlog file (in the SDD loop: `docs/phases/phase-N/backlog.md`; standalone: the path from the user's argument, or a default under `docs/`). Use the issue body template below. Do not publish to any issue tracker and do not apply triage labels.
+**Idempotent append (safe replay):** before writing, check the backlog for issues already recorded for this phase/parent and skip those — re-running after an interrupt must not duplicate. For each *new* slice, append an entry to the phase's backlog file. In the SDD loop this lives under the profile's **phases dir** (`.sdd/profile.md` → Paths → *Phases dir*), i.e. `<phases-dir>/phase-N/backlog.md` — default `docs/phases/phase-N/backlog.md`, but read the location from the profile and don't hardcode `docs/` when it says otherwise. Standalone: the path from the user's argument, or a default under `docs/`. Use the issue body template below. Do not publish to any issue tracker and do not apply triage labels.
 
 Record issues in dependency order (blockers first) so you can reference earlier slices in the "Blocked by" field.
 
