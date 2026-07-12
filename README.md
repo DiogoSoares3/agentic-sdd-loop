@@ -242,4 +242,8 @@ in `PROGRESS.md` and drives iterations via `/loop` (or the `auto` supervisor / a
 
 ---
 
-<sub>**Tests** — `bash tests/faixa-a.sh` runs the deterministic hook suite (35 checks, no model or network): all three hooks — `SessionStart` re-prime, `PreToolUse` test-first, `SubagentStop` verify — plus path-awareness, exercised against real throwaway git repos and profiles. `tests/subagentstop.sh` and `tests/test-paths.sh` are the sub-suites it calls; run either alone too. For the live end-to-end run (**Faixa B**) — a real headless model driven through PLAN → `/compact` → CONTINUE to prove compaction survival — see `tests/live/` (isolated in **Docker** with the repo mounted read-only, or `sandbox-exec` on macOS; needs a token + network).</sub>
+### Testing Suite
+
+*   **Deterministic Hook Suite (`bash tests/faixa-a.sh`):** Runs the deterministic hook suite with 35 checks, completely independent of any model or network dependencies. It exercises all three core hooks—`SessionStart` re-prime, `PreToolUse` test-first, and `SubagentStop` verify—alongside path-awareness tested against real, throwaway git repositories and profiles.
+*   **Sub-suites:** You can also run `tests/subagentstop.sh` and `tests/test-paths.sh` standalone, as these are the specific sub-suites called by the main script.
+*   **Live End-to-End Run (Faixa B):** To run the live end-to-end execution—driven through a real headless model following the `PLAN` → `/compact` → `CONTINUE` flow to verify compaction survival—refer to the `tests/live/` directory. This process requires a token and network access, and is strictly isolated inside **Docker** with the repository mounted as read-only (or via `sandbox-exec` on macOS).
