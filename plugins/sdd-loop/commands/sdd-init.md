@@ -26,7 +26,7 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
    - `docs/PRD.md` skeleton — from `${CLAUDE_PLUGIN_ROOT}/templates/prd/PRD.template.md`, marked
      *DRAFT — awaiting stakeholder validation*.
    - `docs/ARCHITECTURE.md` skeleton — from `${CLAUDE_PLUGIN_ROOT}/templates/arch/ARCHITECTURE.template.md`,
-     marked *DRAFT — awaiting dev validation*.
+     marked *DRAFT — awaiting engineer validation*.
    In each created file, replace the `<PROJECT NAME>` title placeholder with the repo's real project name
    (an unfilled `<…>` token trips `/sdd`'s profile gate).
 
@@ -47,9 +47,9 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
 
    The slots:
    - **Régua** — the single dominant constraint that filters every decision.
-   - **Sources of truth** — paths + who validates each (`PRD.md` → stakeholders, `ARCHITECTURE.md` → devs).
+   - **Sources of truth** — paths + who validates each (`PRD.md` → stakeholders, `ARCHITECTURE.md` → engineers).
    - **Spec gate** — what must be true to leave SPEC and start building (default: `PRD.md` validated with
-     stakeholders AND `ARCHITECTURE.md` validated with devs).
+     stakeholders AND `ARCHITECTURE.md` validated with engineers).
    - **Vertical slice** — what a tracer-bullet slice cuts through in THIS domain.
    - **Issue granularity** — one demoable tracer bullet as the unit, ~300 LOC as the default anchor; adjust
      the number (or the domain's own sizing unit) if this domain's slices run larger or smaller.

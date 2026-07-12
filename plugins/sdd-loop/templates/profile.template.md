@@ -12,11 +12,11 @@ The single filter for every decision, code and process alike. One paragraph.
 | Artifact | Path | Validated by |
 |---|---|---|
 | Product truth | `docs/PRD.md` | stakeholders |
-| Technical truth | `docs/ARCHITECTURE.md` | devs |
+| Technical truth | `docs/ARCHITECTURE.md` | engineers |
 
 ## Spec gate (hard stop before any build)
 What must be true to leave SPEC and start building.
-> e.g. "PRD.md validated with stakeholders AND ARCHITECTURE.md validated with devs."
+> e.g. "PRD.md validated with stakeholders AND ARCHITECTURE.md validated with engineers."
 
 ## Vertical slice (what a tracer bullet cuts through)
 The end-to-end path a single slice must complete in THIS domain.

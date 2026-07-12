@@ -1,6 +1,6 @@
 # ARCHITECTURE — <PROJECT NAME>
 
-> **DRAFT — awaiting dev validation.** Technical truth (how it's built). Referenced by `PRD.md`, not
+> **DRAFT — awaiting engineer validation.** Technical truth (how it's built). Referenced by `PRD.md`, not
 > duplicated. A living document — update it when a decision closes; keep discarded alternatives.
 
 ## Overview

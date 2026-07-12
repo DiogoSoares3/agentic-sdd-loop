@@ -1,7 +1,7 @@
 {
   "name": "sdd-loop",
   "version": "0.2.0",
-  "description": "Agentic Spec-Driven Development loop: an SDD-outer / TDD-inner build loop driven from a stakeholder-validated PRD.md and a dev-validated ARCHITECTURE.md. Main-session orchestrator + bounded subagents (sdd-phase-opener, sdd-issue-worker) + deterministic hooks (SessionStart re-prime, PreToolUse test-first, SubagentStop verify). Project-agnostic; parametrized per repo by .sdd/profile.md.",
+  "description": "Agentic Spec-Driven Development loop: an SDD-outer / TDD-inner build loop driven from a stakeholder-validated PRD.md and an engineer-validated ARCHITECTURE.md. Main-session orchestrator + bounded subagents (sdd-phase-opener, sdd-issue-worker) + deterministic hooks (SessionStart re-prime, PreToolUse test-first, SubagentStop verify). Project-agnostic; parametrized per repo by .sdd/profile.md.",
   "author": {
     "name": "Diogo Soares",
     "email": "soaresdiogodns@gmail.com"

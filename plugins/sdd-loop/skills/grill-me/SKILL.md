@@ -26,7 +26,7 @@ from the template once the interview is done (item 2 below).
    (who calls/depends on whom, direction of data flow), the external actors + data stores, **which
    boundaries are the seams**, and the régua's **hot path**. Then write `ARCHITECTURE.md` — rendering the
    container-and-seams **Mermaid** diagram (+ optional hot-path) from those answers — plus any
-   `docs/adrs/` ADRs. It needs **dev validation**.
+   `docs/adrs/` ADRs. It needs **engineer validation**.
 3. **Validate one escalated `needs-decision` (with the engineer).** The loop stopped on a structural /
    critical / hard-to-reverse call no baseline covers. Grill **one decision only**, with the **engineer**
    for a technical/architecture/behaviour call (or the **stakeholder** for scope). Record the resolution

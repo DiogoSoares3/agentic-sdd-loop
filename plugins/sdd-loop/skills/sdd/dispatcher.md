@@ -183,7 +183,7 @@ orchestrator resolves**:
 - **`blocked`** (missing fixture / unclear boundary / dependency not landed): the branch stays quarantined
   (`doing`, never lands); surface it. Do not fake green.
 - **`needs-revalidation`** (a gap in an *existing* baseline): flow up — `PRD.md` → stakeholders,
-  `ARCHITECTURE.md`/ADR → devs.
+  `ARCHITECTURE.md`/ADR → engineers.
 
 Existing files a worker merely *lacks in context* are **not** escalations — it reads them itself.
 

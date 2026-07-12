@@ -1,6 +1,6 @@
 ---
 name: sdd
-description: Drive a project through an agentic Spec-Driven Development loop — SDD on the outer loop, TDD on the inner loop — from a stakeholder-validated PRD.md and a dev-validated ARCHITECTURE.md. Use when the user wants to start/continue building a project the "SDD" way, run the build loop, pick the next slice, or mentions "sdd", "spec-driven", "the loop", or "loop engineering".
+description: Drive a project through an agentic Spec-Driven Development loop — SDD on the outer loop, TDD on the inner loop — from a stakeholder-validated PRD.md and an engineer-validated ARCHITECTURE.md. Use when the user wants to start/continue building a project the "SDD" way, run the build loop, pick the next slice, or mentions "sdd", "spec-driven", "the loop", or "loop engineering".
 ---
 
 # SDD Loop — the conductor
@@ -27,7 +27,7 @@ real, project-specific value.
 - **`PRD.md`** — the **product** truth: what/why/scope/definition-of-done. **Validated with
   stakeholders.** Structural changes here require re-validation.
 - **`ARCHITECTURE.md`** — the **technical** truth: how it's built, the seams, the decisions/ADRs.
-  **Validated with the devs.**
+  **Validated with the engineers.**
 
 Everything else — phase specs, backlog, tests, code — is **derived** from these two. Spec flows
 down; change flows up only as a controlled amendment (see *Change control*).
@@ -93,7 +93,7 @@ You are always in exactly one of these states. Decide which from `PROGRESS.md`, 
   technical truth — the seams, the test mechanism, the key decisions, the component topology + hot path —
   then write `ARCHITECTURE.md` **from `templates/arch/ARCHITECTURE.template.md`** (rendering the
   container-and-seams diagram from the elicited topology), plus any ADRs from
-  `templates/arch/adr.template.md`, and flag it for **dev validation**. No separate writer skill is
+  `templates/arch/adr.template.md`, and flag it for **engineer validation**. No separate writer skill is
   needed — the template (structure + diagram guidance) and `/grill-me` (elicitation) fully specify it.
 - **Do not proceed to SELECT until the profile's "spec gate" is satisfied.** This gate is a hard stop.
 
@@ -265,7 +265,7 @@ open-ended — each iteration either lands an issue or hits a stop. Stop when:
 ## Change control
 
 - **Structural** (scope, v1 surface, an architectural decision) → re-validate: `PRD.md` with
-  stakeholders, `ARCHITECTURE.md` with devs.
+  stakeholders, `ARCHITECTURE.md` with engineers.
 - **Uncovered decision** (the baselines are silent on a critical call) → **ESCALATE via `/grill-me`**
   (above), then record as an ADR or PRD amendment. This is how the spec grows without drift.
 - **Tactical** (refine an acceptance criterion, detail a contract) → allowed mid-build; record in
