@@ -2,7 +2,7 @@
 
 An **agentic Spec-Driven Development** methodology for code assistants (Claude Code), packaged as an
 installable plugin. **SDD on the outer loop, TDD on the inner loop**, driven from two validated sources
-of truth: a stakeholder-validated `PRD.md` and a dev-validated `ARCHITECTURE.md`.
+of truth: a stakeholder-validated `PRD.md` and an engineer-validated `ARCHITECTURE.md`.
 
 It is **project-agnostic**. The plugin ships the invariant methodology and tools; each repo supplies one
 small `.sdd/profile.md` that parametrizes it for **any** domain — web app, data pipeline, ML / recsys,
@@ -17,14 +17,14 @@ library, CLI, and so on.
 |---|---|---|
 | **1. Core methodology** | the invariant SDD+TDD loop — state machine, gates, escalation, dispatcher, the two build subagents, the lifecycle/enforcement hooks | `skills/sdd/*` · `agents/*` · `hooks/*` |
 | **2. Project profile** | régua, slice, seams, DoD, test command, loop/git knobs | `.sdd/profile.md` *(per repo, via `/sdd-init`)* |
-| **3. Tools** | `/to-prd`, `/to-issues`, `/bdd`, `/tdd`, `/handoff`, `/grill-me` (+ builtin `/loop`, `/schedule`) | `skills/*` |
+| **3. Tools** | `/to-prd`, `/to-issues`, `/to-adr`, `/bdd`, `/tdd`, `/handoff`, `/grill-me` (+ builtin `/loop`, `/schedule`) | `skills/*` |
 
 ## How the loop works
 
-Two validated baselines gate everything. **`PRD.md`** (product truth — MoSCoW scope + `FR-n`/`NFR-n`
-requirements + Definition of Done, validated with stakeholders) and **`ARCHITECTURE.md`** (technical
-truth — seams, components, a Mermaid container+seams diagram, ADR index, validated with devs). Everything
-below is **derived**: phase PRDs, backlog, tests, code.
+Two validated baselines gate everything. **`PRD.md`** (product truth — **personas & user stories**, MoSCoW
+scope + `FR-n`/`NFR-n` requirements + Definition of Done, validated with stakeholders) and
+**`ARCHITECTURE.md`** (technical truth — seams, components, a Mermaid container+seams diagram, ADR index,
+validated with engineers). Everything below is **derived**: phase PRDs, backlog, tests, code.
 
 - **PLAN** — the bounded **`sdd-phase-opener`** subagent cuts the next epic from the root PRD in
   **dependency order**, with **MoSCoW priority as the must-first tiebreak**, and writes a thin **phase PRD**
@@ -55,7 +55,7 @@ guesses ~40% context" trigger was impossible and is gone; there is no `PreCompac
 can't inject context into the model). Recovery = `SessionStart` re-inject **+** RECORD-after-every-issue
 keeping `PROGRESS.md` current. A **clean boundary** (phase drained / project done) needs no handoff — files
 fully describe it. State lives entirely in files, so any fresh context resumes from exact position. With
-**`auto-merge` + `auto` handoff** the loop runs unattended, stopping only for a genuine PRD/ARCHITECTURE
+**`auto-merge` + `continuation: auto`** the loop runs unattended, stopping only for a genuine PRD/ARCHITECTURE
 decision.
 
 ## Architecture — main orchestrator + bounded subagents + hooks
@@ -115,9 +115,9 @@ putting the coordinator in the wrong place.
 
 | File | What | Authored / validated by |
 |---|---|---|
-| `docs/PRD.md` | root product truth — MoSCoW scope, `FR-n`/`NFR-n`, DoD | `/to-prd` → **stakeholders** |
-| `docs/ARCHITECTURE.md` | technical truth — seams, components, Mermaid diagram, ADR index | `/grill-me` + template → **devs** |
-| `docs/adrs/*.md` | closed decisions (from `templates/arch/adr.template.md`) | escalation / SPEC |
+| `docs/PRD.md` | root product truth — personas & user stories, MoSCoW scope, `FR-n`/`NFR-n`, DoD | `/to-prd` → **stakeholders** |
+| `docs/ARCHITECTURE.md` | technical truth — seams, components, Mermaid diagram, ADR index | `/grill-me` + template → **engineers** |
+| `docs/adrs/*.md` | closed decisions (from `templates/arch/adr.template.md`) | **`/to-adr`** — recorded wherever a decision closes (grill / build / escalation) |
 | `docs/phases/phase-N/prd.md` | thin phase projection (derived, no sign-off) | PLAN step |
 | `docs/phases/phase-N/backlog.md` | that phase's vertical issues + Gherkin scenarios | `/to-issues` + `/bdd` |
 | `docs/PROGRESS.md` | durable loop state + the `SDD-CURSOR` resume block (single global cursor) | the loop |
@@ -126,7 +126,7 @@ putting the coordinator in the wrong place.
 ```
 docs/
   PRD.md                    # product baseline (MoSCoW)            — stakeholders
-  ARCHITECTURE.md           # technical baseline (+ Mermaid diagram) — devs
+  ARCHITECTURE.md           # technical baseline (+ Mermaid diagram) — engineers
   adrs/NNNN-*.md            # closed decisions (global)
   phases/
     phase-1/prd.md          # thin projection of epic 1
@@ -140,7 +140,7 @@ docs/
 ## Install (local, for testing)
 
 ```
-/plugin marketplace add /home/diogo/Documentos/Projetos/sdd-loop
+/plugin marketplace add <path-to-this-repo>   # the repo root (holds .claude-plugin/marketplace.json)
 /plugin install sdd-loop@sdd-loop
 ```
 
@@ -171,7 +171,7 @@ any slot still holds placeholder text. The knobs:
 | **PR provider** | `none` | `none` (local merge) \| `gh` \| `bitbucket-mcp` |
 | **Merge policy** | `auto-merge` | `auto-merge` (unattended) \| `human-review` (PR gate; needs a provider) |
 | **Git branches** | `main` / `develop` | protected (never committed) / integration; issues on `issue/<id>-<slug>` |
-| **Paths** | `docs/…` | backlog, PROGRESS, root & phase PRD templates |
+| **Paths** | `docs/…` | baselines, PROGRESS, phases dir — **relocatable; agents, skills & the hooks all read the locations from here** |
 
 ### Prerequisites (only if you opt into them)
 
@@ -220,7 +220,7 @@ human-review` (with a provider) and/or `backlog review: confirm`.
 # --- author & validate the two baselines (the spec gate) ---
 # have the material?  /to-prd synthesizes PRD.md;  write ARCHITECTURE.md from templates/arch/ + engineer
 # nothing yet?        /grill-me authors them by interview — stakeholder for PRD, engineer for ARCHITECTURE
-/sdd               # run the loop: PLAN phase → select slice → BDD+TDD → land → record → gate → handoff
+/sdd               # run the loop: PLAN phase → select slice → BDD+TDD → land → record → gate → continue
 ```
 
 `/sdd` reads `.sdd/profile.md` and **refuses to build until the spec gate** (validated PRD +
@@ -235,4 +235,7 @@ in `PROGRESS.md` and drives iterations via `/loop` (or the `auto` supervisor / a
   skill-to-skill chaining — that is what makes every dispatch safe to replay.
 - **Two sources of truth, human-validated;** everything else is derived. Change flows up as a controlled
   amendment, never a silent edit.
+- **Deliverables stay plugin-agnostic.** `PRD.md` / `ARCHITECTURE.md` / ADRs read for any stakeholder or
+  engineer — the plugin mechanics (`/bdd`, `/tdd`, the loop, the cursor) live in the profile & skills, and
+  the orchestrator talks to you in plain product/engineering terms, never internal jargon.
 - **Simple > flexible.** One régua governs every decision.
