@@ -176,7 +176,7 @@ orchestrator resolves**:
 
 - **`needs-decision`** (structural/critical decision no baseline covers): the worker returns the exact
   question and terminates. The orchestrator runs **`/grill-me`** with the **engineer** (technical) or
-  **stakeholder** (scope), records the resolution as a new **ADR** (`docs/adrs/`) + `ARCHITECTURE.md` update
+  **stakeholder** (scope), records the resolution as a new **ADR** (via **`/to-adr`**) + `ARCHITECTURE.md` update
   or a **PRD amendment**, then **re-dispatches the worker** with the decision now in the baselines (and in
   the pack). The orchestrator **never resolves a structural decision from its own context** — that is
   silent drift; structural always goes to the human.

@@ -39,12 +39,12 @@ from the template once the interview is done (item 2 below).
    interaction, a state machine); how many is your read on the project's complexity — often none or one, no
    fixed cap — each validated with the user and earning its place (the régua: prose beats a stale picture).
    As decisions land, stay aware that **a weighty one — a real fork, hard-to-reverse, or a stakeholder/engineer call others
-   will inherit — may be worth capturing as an ADR right then** (`docs/adrs/` from `adr.template.md`, naming
-   the discarded alternative), *while* building the architecture rather than only after. **Nothing forces an
+   will inherit — may be worth capturing as an ADR right then** (write it via **`/to-adr`**, which numbers it
+   and names the discarded alternative), *while* building the architecture rather than only after. **Nothing forces an
    ADR per decision** — it's a judgment call on what a future agent will need to know. It needs **engineer
    validation**.
 3. **Validate one escalated `needs-decision` (with the engineer).** The loop stopped on a structural /
    critical / hard-to-reverse call no baseline covers. Grill **one decision only**, with the **engineer**
    for a technical/architecture/behaviour call (or the **stakeholder** for scope). Record the resolution
-   as a new **ADR** + `ARCHITECTURE.md` update (engineer-owned) or a **PRD amendment** (stakeholder-owned)
+   as a new **ADR** (via **`/to-adr`**) + `ARCHITECTURE.md` update (engineer-owned) or a **PRD amendment** (stakeholder-owned)
    — never let the build agent invent it silently. Then the loop resumes and future agents inherit it.

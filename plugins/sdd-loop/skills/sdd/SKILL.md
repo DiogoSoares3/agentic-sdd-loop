@@ -9,7 +9,7 @@ You orchestrate a build **from the main session** — you are the coordinator th
 a builder. You do **not** invent the process per project. The **invariant spine** is below (Layer 1). The
 **per-project values** (what a slice is, the seams, the *régua*, the test command) live in `.sdd/profile.md`
 (Layer 2) — read it, never hardcode its contents here. The **tools** you call (`/to-prd`, `/to-issues`,
-`/bdd`, `/tdd`, `/handoff`, `/grill-me`, `/loop`) are Layer 3. You dispatch bounded work to two subagents —
+`/to-adr`, `/bdd`, `/tdd`, `/handoff`, `/grill-me`, `/loop`) are Layer 3. You dispatch bounded work to two subagents —
 **[`sdd-phase-opener`](../../agents/phase-opener.md)** (cut one phase) and
 **[`sdd-issue-worker`](../../agents/issue-worker.md)** (build one issue) — and shipped **hooks** (`hooks/`)
 inject state and enforce test-first deterministically. The **dispatcher** (the loop's bottleneck) is
@@ -92,9 +92,9 @@ You are always in exactly one of these states. Decide which from `PROGRESS.md`, 
 - **`ARCHITECTURE.md` missing/unvalidated?** Run **`/grill-me` with the engineer** to author the
   technical truth — the seams, the test mechanism, the key decisions, the component topology + hot path —
   then write `ARCHITECTURE.md` **from `templates/arch/ARCHITECTURE.template.md`** (rendering the
-  container-and-seams diagram from the elicited topology), plus any ADRs from
-  `templates/arch/adr.template.md`, and flag it for **engineer validation**. No separate writer skill is
-  needed — the template (structure + diagram guidance) and `/grill-me` (elicitation) fully specify it.
+  container-and-seams diagram from the elicited topology), plus any ADRs (write each via **`/to-adr`**),
+  and flag it for **engineer validation**. `ARCHITECTURE.md` itself needs no writer skill — its template +
+  `/grill-me` fully specify it; only the small, numbered ADRs route through the thin `/to-adr` writer.
 - **Do not proceed to SELECT until the profile's "spec gate" is satisfied.** This gate is a hard stop.
 
 ### PLAN phase → phase PRD + epic backlog
@@ -178,9 +178,9 @@ definition):
 - Run **`/grill-me`** to put the human who owns that truth in the loop — the **engineer** for a
   technical / architecture / behaviour call, the **stakeholder** for scope — on that single decision,
   one branch at a time (propose a recommendation per question).
-- **Flow the resolution up:** technical → a new **ADR** in `docs/adrs/` (from
-  `templates/arch/adr.template.md`) + update `ARCHITECTURE.md` (engineer-validated); scope/product → a
-  **PRD amendment** (stakeholder-validated). The baseline now covers it.
+- **Flow the resolution up:** technical → a new **ADR** (write it via **`/to-adr`**) + update
+  `ARCHITECTURE.md` (engineer-validated); scope/product → a **PRD amendment** (stakeholder-validated). The
+  baseline now covers it.
 - Resume the issue; future agents inherit the decision — the spec grew, controlled.
 
 **Tactical, reversible** decisions do NOT escalate: make them and record them in `PROGRESS.md`.
