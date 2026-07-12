@@ -28,17 +28,23 @@ INPUT="$(cat)"
 FILE="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty')"
 [ -n "$FILE" ] || exit 0
 
+# Classify by the path RELATIVE to the repo root, never the absolute path — otherwise an ancestor
+# directory named like "…test…" / "…spec…" / "…docs…" (e.g. a repo under ~/dev/testing/) would match
+# the patterns below for EVERY file and silently disable the guard. Strip the ROOT prefix; a path that
+# is already relative is left as-is.
+REL="${FILE#"$ROOT"/}"
+
 TESTPAT="${SDD_TEST_PATTERN:-(test|tests|spec|specs|_test\.|\.test\.|\.spec\.|/tests?/)}"
 INT_BRANCH="${SDD_INTEGRATION_BRANCH:-develop}"
 
 # Editing a test file IS test-first-compliant.
-printf '%s' "$FILE" | grep -qiE "$TESTPAT" && exit 0
+printf '%s' "$REL" | grep -qiE "$TESTPAT" && exit 0
 
 # Docs / spec / loop-state / config are NOT implementation — always allowed (never gated by test-first).
 # This is what lets the worker record a needs-decision to PROGRESS.md, update the backlog, or write an ADR
 # on the issue branch before any test exists. The BDD outer test still gates real code.
 ALLOWPAT="${SDD_ALLOW_PATTERN:-(\.md$|\.mdx$|\.rst$|\.txt$|/docs/|/\.sdd/|/adrs?/|(^|/)PROGRESS\.|(^|/)backlog\.)}"
-printf '%s' "$FILE" | grep -qiE "$ALLOWPAT" && exit 0
+printf '%s' "$REL" | grep -qiE "$ALLOWPAT" && exit 0
 
 # Only guard while on an issue branch.
 git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 || exit 0
