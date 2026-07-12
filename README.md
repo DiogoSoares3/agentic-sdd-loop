@@ -239,3 +239,7 @@ in `PROGRESS.md` and drives iterations via `/loop` (or the `auto` supervisor / a
   engineer — the plugin mechanics (`/bdd`, `/tdd`, the loop, the cursor) live in the profile & skills, and
   the orchestrator talks to you in plain product/engineering terms, never internal jargon.
 - **Simple > flexible.** One régua governs every decision.
+
+---
+
+<sub>**Tests** — `bash tests/faixa-a.sh` runs the deterministic hook suite (35 checks, no model or network): all three hooks — `SessionStart` re-prime, `PreToolUse` test-first, `SubagentStop` verify — plus path-awareness, exercised against real throwaway git repos and profiles. `tests/subagentstop.sh` and `tests/test-paths.sh` are the sub-suites it calls; run either alone too. Regression only — the live model runs (Faixa B) are not included.</sub>
