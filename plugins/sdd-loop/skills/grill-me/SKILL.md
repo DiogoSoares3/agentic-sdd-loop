@@ -27,12 +27,18 @@ from the template once the interview is done (item 2 below).
    seam/decision should trace to the FR/NFR it serves or the régua it satisfies. Don't force it — this is a
    sanity check, not a gate; a decision that answers no requirement is *likely* gold-plating, one that
    conflicts is a `needs-revalidation` back to the stakeholder. Interview the engineer for the technical
-   truth — the **seams** (highest, fewest), the **test mechanism**, components, and the key decisions.
-   Ask enough to **draw the diagrams the template wants**: the components/layers and their **edges**
-   (who calls/depends on whom, direction of data flow), the external actors + data stores, **which
-   boundaries are the seams**, and the régua's **hot path**. Then write `ARCHITECTURE.md` — rendering the
-   container-and-seams **Mermaid** diagram (+ optional hot-path) from those answers. As decisions land,
-   stay aware that **a weighty one — a real fork, hard-to-reverse, or a stakeholder/engineer call others
+   truth — the **seams** (highest, fewest), the **test mechanism**, components, the key decisions, and the
+   **repository/directory/script structure** (map an existing layout and sanity-check it makes sense, or
+   propose one for a fresh repo — the shape of the codebase is part of the architecture, so **validate it
+   with the user**). Ask enough to **draw the diagrams the template wants**: the components/layers and their
+   **edges** (who calls/depends on whom, direction of data flow), the external actors + data stores, and
+   **which boundaries are the seams**. Then write `ARCHITECTURE.md`, rendering the container-and-seams
+   **Mermaid** overview from those answers — and **validate that overview with the user**: the whole-system
+   picture must be one they confirm, whatever the project's size. Add more granular diagrams **only where one
+   would show a fresh agent something the overview can't** (a hot path the régua cares about, a tricky
+   interaction, a state machine); how many is your read on the project's complexity — often none or one, no
+   fixed cap — each validated with the user and earning its place (the régua: prose beats a stale picture).
+   As decisions land, stay aware that **a weighty one — a real fork, hard-to-reverse, or a stakeholder/engineer call others
    will inherit — may be worth capturing as an ADR right then** (`docs/adrs/` from `adr.template.md`, naming
    the discarded alternative), *while* building the architecture rather than only after. **Nothing forces an
    ADR per decision** — it's a judgment call on what a future agent will need to know. It needs **engineer

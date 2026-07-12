@@ -12,8 +12,9 @@ The shape of the solution in a few sentences.
 One whole-project view a fresh agent primes on — **container/component altitude, not code-level**:
 external actors, the main components/layers, data stores, external deps. **Mark the seams** (where
 `/bdd` + `/tdd` intercept) — that is what makes this diagram load-bearing for the loop, not decoration.
-Use **Mermaid** (text diffs in git; no binary assets). Keep it to **one** diagram; the régua wins if a
-truthful diagram gets expensive — prose beats a stale picture.
+Use **Mermaid** (text diffs in git; no binary assets). Keep the overview itself to **one** container view,
+and **validate it with the user via `/grill-me`** — the whole-system picture is theirs to confirm whatever
+the project's complexity. The régua wins if a truthful diagram gets expensive — prose beats a stale picture.
 
 ```mermaid
 flowchart LR
@@ -25,10 +26,13 @@ flowchart LR
   %% dashed = seam: where behaviour/unit tests intercept
 ```
 
-### Hot-path flow (optional — only the régua's dominant path)
-Add **at most one** more diagram, for the single flow the régua cares about (e.g. the read/redirect hot
-path), and only if it is not obvious from the container view above. Finer-grained per-scenario sequences
-live in the phase PRDs / Gherkin, not here. Rule of three before a third diagram.
+### Additional diagrams (as needed — often none)
+Beyond the container view, add a more granular diagram **wherever one would carry information the overview
+can't** — a hot path the régua cares about, a tricky interaction, a state machine. How many is a judgment
+call on the project's complexity (frequently zero or one), **validated with the user via `/grill-me`** —
+there is **no fixed cap and no quota**. The discipline is the régua's, not a number: each diagram must earn
+its place and stay truthful (prose beats a stale or decorative picture), and finer per-scenario sequences
+live in the phase PRDs / Gherkin, not here.
 
 ## Seams
 Where behavior is intercepted for testing (prefer existing, highest, fewest). These are what the
@@ -36,6 +40,12 @@ phases and `/tdd` reference.
 
 ## Components / layers
 The modules/layers and their responsibilities.
+
+## Structure (repository layout)
+Where things physically live — the directory / module / script layout (and, for a multi-repo system, which
+repo owns what). For an existing codebase, **map what's there and sanity-check it makes sense**; for a new
+one, **propose the initial layout**. Either way it is **validated with the user via `/grill-me`** — the
+shape of the repo is a decision, not an accident. Folder/module altitude, not a file-by-file dump.
 
 ## Key decisions (ADRs)
 Index of closed decisions → link to `docs/adrs/`. Each ADR names the discarded alternative and why.
