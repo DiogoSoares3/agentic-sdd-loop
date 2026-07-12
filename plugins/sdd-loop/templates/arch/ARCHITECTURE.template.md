@@ -1,6 +1,8 @@
 # ARCHITECTURE — <PROJECT NAME>
 
-> **DRAFT — awaiting engineer validation.** Technical truth (how it's built). Referenced by `PRD.md`, not
+> **DRAFT — awaiting engineer validation.** Technical truth (how it's built) — it **realizes the validated
+> `PRD.md`**: one level below it in the hierarchy (equal-weight baseline, not lesser in importance).
+> Decisions here should trace to the FR/NFR/régua they serve; the product *what/why* is referenced, not
 > duplicated. A living document — update it when a decision closes; keep discarded alternatives.
 
 ## Overview

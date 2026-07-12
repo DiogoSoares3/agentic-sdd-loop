@@ -1,11 +1,15 @@
 # ADR-NNNN: <short title of the decision>
 
 > Status: proposed | accepted | superseded-by ADR-MMMM · Date: YYYY-MM-DD · Deciders: <who>
-> Raised by the SDD loop as `needs-decision`; resolved via `/grill-me` on YYYY-MM-DD.
+> Origin: authored with `ARCHITECTURE.md` | closed during the PRD grill | a phase/issue decision |
+> a `needs-decision` escalation — resolved via `/grill-me` on YYYY-MM-DD. (ADRs accrue **wherever a
+> decision closes** along the loop, not only from escalations.)
 
 ## Context
-The decision the loop was forced to make to proceed, and **why the baselines didn't cover it** — what
-the phase PRD / ARCHITECTURE were silent on. Keep it to the forcing question.
+The decision and what forced it. If the loop raised it as `needs-decision`, say **why the baselines didn't
+cover it** (what the phase PRD / `ARCHITECTURE.md` were silent on); if it closed while authoring a baseline,
+just the forcing question. Either way, name the **PRD requirement/constraint it ultimately serves** (an
+`FR`/`NFR` or the régua) so even a technical call stays anchored to product truth. Keep it tight.
 
 ## Decision
 What we chose. One or two sentences.

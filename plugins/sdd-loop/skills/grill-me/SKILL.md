@@ -21,13 +21,20 @@ from the template once the interview is done (item 2 below).
    of v1, requirements, definition of done, out-of-scope — then hand off to **`/to-prd`** to write `PRD.md`
    (which fills the **Personas & user stories** section, every persona with at least one story). It still
    needs **stakeholder validation** before the spec gate opens.
-2. **Author a missing `ARCHITECTURE.md` (with the engineer).** Interview the engineer for the technical
+2. **Author a missing `ARCHITECTURE.md` (with the engineer).** It **realizes the validated `PRD.md`** — one
+   level below it in the hierarchy (PRD = *why/what*, architecture = *how-to-realize-it*) though both are
+   equal-weight validated baselines. So keep decisions **minimally in accordance with the PRD**: a
+   seam/decision should trace to the FR/NFR it serves or the régua it satisfies. Don't force it — this is a
+   sanity check, not a gate; a decision that answers no requirement is *likely* gold-plating, one that
+   conflicts is a `needs-revalidation` back to the stakeholder. Interview the engineer for the technical
    truth — the **seams** (highest, fewest), the **test mechanism**, components, and the key decisions.
    Ask enough to **draw the diagrams the template wants**: the components/layers and their **edges**
    (who calls/depends on whom, direction of data flow), the external actors + data stores, **which
    boundaries are the seams**, and the régua's **hot path**. Then write `ARCHITECTURE.md` — rendering the
-   container-and-seams **Mermaid** diagram (+ optional hot-path) from those answers — plus any
-   `docs/adrs/` ADRs. It needs **engineer validation**.
+   container-and-seams **Mermaid** diagram (+ optional hot-path) from those answers — and **record each
+   closed decision as an ADR as it surfaces** (`docs/adrs/` from `adr.template.md`, naming the discarded
+   alternative): grill-me captures the ADRs *while* building the architecture, not as an afterthought. It
+   needs **engineer validation**.
 3. **Validate one escalated `needs-decision` (with the engineer).** The loop stopped on a structural /
    critical / hard-to-reverse call no baseline covers. Grill **one decision only**, with the **engineer**
    for a technical/architecture/behaviour call (or the **stakeholder** for scope). Record the resolution
