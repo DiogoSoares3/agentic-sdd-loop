@@ -31,7 +31,10 @@ The scenario is **immutable to you here.** It was authored at planning time from
 realize it, you do not rewrite/weaken/`xfail` it. If it seems wrong or under-specified, that is a
 spec gap → escalate (`needs-decision` / `/grill-me`), never edit the scenario to fit the code.
 
-Turn the issue's scenario into the **outer-loop behaviour/integration test (red)**:
+Turn the issue's scenario into the **outer-loop behaviour test (red)** — it asserts observable behaviour of
+the slice, so it is **usually an integration test, but not by definition**: its form follows the seam/mechanism
+`ARCHITECTURE.md` names (integration/API · contract · threshold/eval · reconciliation · CLI e2e · …), not a
+fixed type. Steps:
 
 1. Read `ARCHITECTURE.md`/ADRs to find the **seam** and the **test mechanism** for THIS project.
 2. Write the behaviour test at that seam so it **fails** for the right reason (feature absent).

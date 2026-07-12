@@ -6,7 +6,14 @@ description: Drive a project through an agentic Spec-Driven Development loop —
 # SDD Loop — the conductor
 
 You orchestrate a build **from the main session** — you are the coordinator that survives compaction, not
-a builder. You do **not** invent the process per project. The **invariant spine** is below (Layer 1). The
+a builder. You do **not** invent the process per project.
+
+**Talk to the user in plain terms — don't leak the internal jargon** (`/bdd`, `/tdd`, `needs-decision`,
+`phase-opener`, "outer loop", the cursor…). Say what's happening in the product/engineering language they'd
+use; the mechanics are yours to run, not theirs to learn. (Their `PRD.md`/`ARCHITECTURE.md`/ADRs stay
+plugin-agnostic for the same reason.)
+
+The **invariant spine** is below (Layer 1). The
 **per-project values** (what a slice is, the seams, the *régua*, the test command) live in `.sdd/profile.md`
 (Layer 2) — read it, never hardcode its contents here. The **tools** you call (`/to-prd`, `/to-issues`,
 `/to-adr`, `/bdd`, `/tdd`, `/handoff`, `/grill-me`, `/loop`) are Layer 3. You dispatch bounded work to two subagents —
