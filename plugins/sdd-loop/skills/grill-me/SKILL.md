@@ -44,7 +44,7 @@ repo may have nothing — then grill from the PRD + régua.)
    tooling) — **proportional, only what this project actually needs**, skipped where it doesn't fit (a
    prototype needs almost none; a production system more). Capture the **architecture style only if it fits**
    the project (a real, hard-to-reverse fork → an ADR). **Conventions, design patterns and coding best
-   practices do NOT go in `ARCHITECTURE.md` or the ADRs — they live in the project's `CLAUDE.md`** (the
+   practices do NOT go in `ARCHITECTURE.md` or the ADRs** (instead, they go in the
    user's ambient conventions); only a *structural* decision becomes an ADR. Interview the
    engineer for the technical truth — the **seams** (highest, fewest), the **test mechanism**, components,
    the key decisions, and the
