@@ -8,6 +8,15 @@ argument-hint: "[project domain — freeform, e.g. web app · data pipeline · M
 The plugin ships the invariant methodology (Layer 1) and the tools (Layer 3). This command creates
 the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable state and spec skeletons.
 
+> **Speak standard technical language — never leak the plugin's internal jargon.** Throughout this
+> command (detecting the domain, interviewing one slot at a time, reporting the next move), translate
+> the mechanics into the domain and engineering terms the user already speaks. Do **not** surface
+> internal names like `sdd-phase-opener`, `sdd-issue-worker`, `needs-decision`, the
+> `SDD-CURSOR`, "outer/inner loop", or "dispatcher". Explain each profile slot in plain terms — *what*
+> it controls and why — rather than by its internal knob name. This is the same rule the `/sdd` skill
+> follows; apply it here too, and the reminder is carried into the generated `.sdd/profile.md` so every
+> downstream agent inherits it.
+
 ## Steps
 
 1. **Detect / confirm the project's domain** from `$ARGUMENTS` or by exploring the repo. The domain is

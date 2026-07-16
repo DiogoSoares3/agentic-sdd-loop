@@ -3,6 +3,15 @@
 > Layer 2. The **only** file that changes between projects. The plugin's `/sdd` skill reads this to
 > parametrize the invariant methodology. Keep it lean; fill every slot.
 
+> **Communication reminder (inherited by every agent/skill that reads this profile).** When talking to
+> stakeholders or engineers, use standard domain and engineering language — do **not** leak the plugin's
+> internal jargon (`/bdd`, `/tdd`, `sdd-phase-opener` / `sdd-issue-worker`, `needs-decision`, the
+> `SDD-CURSOR`, "outer/inner loop", "dispatcher"). Translate the mechanics into the terms the reader
+> already uses. This covers both the chat and every human-readable artifact: `PRD.md`,
+> `ARCHITECTURE.md`, ADRs, and the readable content of the phase PRDs and backlog (issue descriptions and
+> Gherkin scenarios in domain language — only planning fields like the `Inner loop (TDD)` flag and issue
+> ids stay). **This profile is the sole exception:** as internal config it keeps the knob names.
+
 ## Régua (dominant constraint)
 The single filter for every decision, code and process alike. One paragraph.
 > e.g. "Solo maintainer — simple > flexible." / "Graded, reproducible deliverable — every number
