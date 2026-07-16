@@ -24,10 +24,21 @@ PROGRESS_REL="$(prof_path 'Durable state')"; : "${PROGRESS_REL:=docs/PROGRESS.md
 case "$PROGRESS_REL" in /*) PROGRESS="$PROGRESS_REL";; *) PROGRESS="$ROOT/$PROGRESS_REL";; esac
 
 # --- Extract the SDD-CURSOR block + its four fields (robust: fixed markers, fixed keys). ---
-cur_field() { printf '%s\n' "$CURSOR" | grep -iE "^- $1:" | head -n1 | sed -E "s/^- $1:[[:space:]]*//I"; }
+# Tolerant of formatting drift in the cursor lines — optional indentation, a `-`/`*` bullet, and
+# markdown bold around the key (`- **Phase:** 1`, `- **Phase**: 1`, `  - Phase : 1`). ALWAYS exits 0
+# (|| true): a missing/renamed field degrades to empty -> the `:=unknown` fallback below, never a
+# `set -e` abort. This is load-bearing — the hook must reach `exit 0` and inject context on EVERY
+# resume/compact, so it can never die (silently, no stderr) on a reformatted PROGRESS.md.
+cur_field() {
+  { printf '%s\n' "$CURSOR" \
+      | grep -iE "^[[:space:]]*[-*][[:space:]]*\**[[:space:]]*$1[[:space:]]*\**[[:space:]]*:" \
+      | head -n1 \
+      | sed -E "s/^[[:space:]]*[-*][[:space:]]*\**[[:space:]]*$1[[:space:]]*\**[[:space:]]*://I; s/^[[:space:]*]+//; s/[[:space:]*]+$//"
+  } || true
+}
 CURSOR=""; PHASE=""; DOING=""; NEXT=""; STOP=""
 if [ -f "$PROGRESS" ]; then
-  CURSOR="$(awk '/<!-- SDD-CURSOR/{f=1;next} /<!-- \/SDD-CURSOR/{f=0} f' "$PROGRESS" 2>/dev/null || true)"
+  CURSOR="$(awk '/<!--[[:space:]]*SDD-CURSOR/{f=1;next} /<!--[[:space:]]*\/SDD-CURSOR/{f=0} f' "$PROGRESS" 2>/dev/null || true)"
   PHASE="$(cur_field Phase)"; DOING="$(cur_field Doing)"; NEXT="$(cur_field Next)"; STOP="$(cur_field Stop-reason)"
 fi
 : "${PHASE:=unknown}" "${DOING:=unknown}" "${NEXT:=unknown}" "${STOP:=unknown}"

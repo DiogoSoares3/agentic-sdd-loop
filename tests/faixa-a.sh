@@ -17,8 +17,10 @@ mkrepo(){ # $1 dir ; profile with +hook, develop base, issue branch
   echo seed > "$d/README.md"; git -C "$d" add -A; git -C "$d" commit -qm seed
 }
 enf(){ # $1 project-dir  $2 file_path  -> echoes exit code (0 allow / 2 block)
-  printf '%s' "$(jq -nc --arg f "$2" '{tool_input:{file_path:$f}}')" \
-    | CLAUDE_PROJECT_DIR="$1" bash "$ENF" >/dev/null 2>&1; echo $?
+  # Feed via here-string, not a pipe: a fail-open hook may exit BEFORE reading stdin, which would
+  # SIGPIPE a piped writer and (under pipefail) surface as 141 instead of the hook's real exit code.
+  local json; json="$(jq -nc --arg f "$2" '{tool_input:{file_path:$f}}')"
+  CLAUDE_PROJECT_DIR="$1" bash "$ENF" >/dev/null 2>&1 <<<"$json"; echo $?
 }
 
 echo "===== GROUP 1 — PreToolUse: test-first (+hook) ====="
