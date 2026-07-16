@@ -71,9 +71,10 @@ The exact command(s) that prove a slice green.
 - **Continuation mode (gate at a boundary / on resume):** governs what the orchestrator does when the loop
   reaches a boundary or re-enters after a compaction/crash — **not** who holds context (dispatch is always
   via subagents).
-  - `ask` (**default**) — the *alive* session pauses, presents the resume cursor from `PROGRESS.md`
-    (`Phase / Doing / Next / Stop-reason`) + the recommended next action, and **asks the user whether to
-    continue** before dispatching. Supervised runs.
+  - `ask` (**default**) — at a boundary / on re-entry only (**not** before each intra-phase issue), the
+    *alive* session pauses, presents the resume cursor from `PROGRESS.md` (`Phase / Doing / Next /
+    Stop-reason`) + the recommended next action, and **asks whether to continue** before dispatching; within
+    a phase, issues run consecutively. Supervised runs.
   - `auto` — self-continuing (unattended): keep dispatching workers without asking; own overflow is caught
     by the `SessionStart` re-prime + `/loop`; **no flat supervisor**. A `blocked` / `needs-decision` /
     `needs-revalidation` stop always surfaces to a human regardless of this knob.
@@ -81,8 +82,9 @@ The exact command(s) that prove a slice green.
   decides ask-first vs proceed.
 - **Backlog review (gate at PLAN, before BUILD):** governs the human gate on the *derived scope* of a phase.
   - `auto` (**default**) — the `sdd-phase-opener`'s cut goes straight to BUILD.
-  - `confirm` — pause after the backlog is cut and surface it for the user to **approve/edit the phase scope**
-    before any build. The two baselines stay the only human-validated docs; this is an optional gate on the
+  - `confirm` — a **one-time** pause after the backlog is cut: the user **approves/edits the phase scope + how
+    the issues will run**, then BUILD proceeds straight through **without pausing per issue**. The two
+    baselines stay the only human-validated docs; this is an optional gate on the
     derived layer.
   Orthogonal to Continuation mode: this gates *what gets built* (the plan); Continuation gates *whether to
   proceed* at a boundary.

@@ -83,7 +83,8 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
      runs, offer to register a **scheduled watchdog** (`/schedule` running `/sdd`) that re-triggers after a
      session death.
    - **Backlog review** — `auto` (default; the cut phase backlog goes straight to build) or `confirm`
-     (pause after `/to-issues` to approve/edit the backlog before building).
+     (a **one-time** pause after `/to-issues` to approve/edit the backlog + how issues run, then build
+     proceeds straight through — it does **not** re-pause before each issue).
    - **Integrity enforcement** — `prose+git +hook` (**default**): the base (`prose+git`: immutable scenario,
      RED proof, test-first commit, clean re-run) **plus** the shipped `PreToolUse` guard (`+hook`: on an
      `issue/*` branch, deny an implementation edit until a **behaviour/BDD test** is committed — this gates
