@@ -163,7 +163,9 @@ subagents). Every issue is built on **its own branch off the integration branch
 ### RECORD progress
 - Update `PROGRESS.md`: mark the slice `done` (auto-merge) or `in-review` with its **PR URL**
   (human-review); note what changed, what's next, any open question. Under human-review a human merging
-  the PR is what flips the issue to `done` (reconciled on next prime).
+  the PR is what flips the issue to `done` (reconciled on next prime). **Keep it lean** — one concise
+  worklog line per slice, per PROGRESS.md's fixed structure; old phases are compacted to a mini-summary
+  by the phase-opener, so don't accumulate old-issue detail.
 - **Update the `SDD-CURSOR` block** (the four fixed fields the `SessionStart` hook reads): `Phase`, `Doing`
   (the issue now mid-build, or `none`), `Next` (the true next grabbable `todo`, or `none — phase drained` /
   `none — project complete` / `none — awaiting-review`), and `Stop-reason` (`none` while running, else the

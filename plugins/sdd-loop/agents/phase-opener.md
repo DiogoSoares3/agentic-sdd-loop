@@ -41,9 +41,12 @@ sub-agents**. The job fits one context window by design — cut, write, stop.
      model/experiment work where the outer threshold test is the real gate). The **outer scenario is always
      required** — the flag never disables it. This flag is authored **here** and is immutable to the worker.
    - **Blocked by** — blocker issue ids, in dependency order (blockers first), or "None — can start immediately".
-4. **Set the resume cursor.** Update the `SDD-CURSOR` block in `docs/PROGRESS.md`: `Phase: N`, `Doing: none`,
-   `Next: <first grabbable issue id>`, `Stop-reason: none` — so the orchestrator (and the `SessionStart`
-   hook) resume into BUILD at the right issue.
+4. **Set the resume cursor + compact PROGRESS.** Update the `SDD-CURSOR` block in `docs/PROGRESS.md`:
+   `Phase: N`, `Doing: none`, `Next: <first grabbable issue id>`, `Stop-reason: none` — so the orchestrator
+   (and the `SessionStart` hook) resume into BUILD at the right issue. **If a prior phase just finished
+   (N>1):** collapse its worklog into ONE line under *Completed phases* (`Phase N-1 — <epic>: done · <high-level>
+   · DoD met`), then clear the *Worklog*, resolved *Open questions*, and merged *In review* rows — keep
+   PROGRESS lean (current state in full, past as one-liners). Never alter the cursor block's fixed format.
 5. **Idempotent.** If the phase PRD / backlog already exist for this phase, reconcile — never duplicate an
    already-recorded issue.
 
