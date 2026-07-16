@@ -35,6 +35,11 @@ Break the plan into **tracer bullet** issues. Each issue is a thin vertical slic
   trivially small, merge them. LOC is only a **proxy** — some domains size differently (a data slice by
   model+tests, an ML slice by feature+eval) — so when the number conflicts with demoability or the régua,
   demoability and the régua win. Tune the anchor per project via `.sdd/profile.md`.
+- **Where a slice sits in the acceptance gradient — the finest tier:** one issue = **one demoable
+  behaviour = one Gherkin `Scenario:`**. Several issues **collectively** satisfy one **phase-DoD item**
+  (the intermediate tier, in the phase PRD), which in turn rolls up to the **root DoD** (product level). So
+  a slice is never a whole phase-DoD item, let alone a root DoD item — if one issue seems to cover an
+  entire phase-DoD item, it's probably too coarse; split it.
 
 </vertical-slice-rules>
 

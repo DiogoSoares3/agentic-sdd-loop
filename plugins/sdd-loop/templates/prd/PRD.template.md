@@ -52,9 +52,15 @@ Numbered so phases and DoD can anchor to IDs. Functional and non-functional spli
 - `NFR-2` — …
 
 ## Definition of done
-The **complete, validated** "done" for this version, per the régua — concrete and checkable, anchored to
-requirement IDs. This is **product-level** acceptance. The *technical* testing decisions (seams, test
-types, mocking, prior art) live in `ARCHITECTURE.md`, not here.
+The **complete, validated** "done" for this version, per the régua — a **checkable list**, each item an
+observable/verifiable acceptance statement anchored to the requirement ID(s) it closes. This is
+**product-level** acceptance; the *technical* testing decisions (seams, test types, mocking, prior art)
+live in `ARCHITECTURE.md`, not here. Keep every item as a `- [ ]` checkbox so "done" can be ticked off
+literally.
+
+- [ ] <checkable, observable acceptance statement> → `FR-1`, `FR-2`
+- [ ] <checkable, observable acceptance statement> → `NFR-1`
+- [ ] …
 
 ## Notes
 Open questions; links to `ARCHITECTURE.md` sections / ADRs.
