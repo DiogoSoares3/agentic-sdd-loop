@@ -32,6 +32,9 @@ Work on `issue/<id>-<slug>` off the freshly-pulled integration branch (`develop`
 protected branch. On resume (branch already has commits), continue from **actual git/test state** — run the
 test command to read red/green and pick up there; do not demand a fresh RED.
 
+**One branch, one merge.** Do ALL work here — behaviour test, implementation, unit tests, refactor, and
+every doc / `PROGRESS.md` / backlog update. **Never open a second branch** (e.g. a separate docs branch).
+
 ## The double loop
 Drive it through the shipped skills: **invoke the `/bdd` skill** to realize the outer scenario, and — when
 the flag is `required` — **invoke the `/tdd` skill** to run the inner loop. They carry the detailed method

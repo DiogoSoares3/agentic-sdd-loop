@@ -169,6 +169,8 @@ subagents). Every issue is built on **its own branch off the integration branch
   `none — project complete` / `none — awaiting-review`), and `Stop-reason` (`none` while running, else the
   reason the loop paused). This block is the deterministic resume point — keeping it current at every RECORD
   is what lets a compacted or re-entered session (and the `ask` prompt) know exactly where it is.
+- **Prune landed issues:** on `done`, remove the worktree + delete the local **and** remote issue branch
+  (sweep earlier leftovers too). Never prune a `blocked` / `needs-decision` branch — it's quarantined.
 - **Tactical** spec refinements (tighten a criterion) → record here and reflect into `PRD.md`.
   **Structural** changes (scope/architecture) → stop and flow up for re-validation.
 

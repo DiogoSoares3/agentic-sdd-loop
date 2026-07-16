@@ -79,7 +79,9 @@ spec file, it **reads it itself** — the orchestrator is not a file server, onl
 ## Git strategy (branch-per-issue)
 
 The loop **never commits to a protected branch**. Each issue is built on its own `issue/<id>-<slug>` branch
-off the **integration branch** (`develop` by default) and lands there; `main` is human-only. Two knobs:
+off the **integration branch** (`develop` by default) and lands there; `main` is human-only. **One branch,
+one merge:** all of the issue's work — code, tests, docs, `PROGRESS.md` — lands on that single branch; never
+a second branch. Two knobs:
 
 - **PR provider** — `none` (default, local merge) | `gh` | `bitbucket-mcp`. The provider is the PR surface.
 - **Merge policy** — how a green branch reaches `develop`:
@@ -99,6 +101,11 @@ human-review:  todo → doing → in-review (PR open, green) → done (PR merged
 issue whose work is already in the integration branch as `done` (check `gh pr view`, or `git branch
 --merged` / log for the `issue/<id>` commits). Files stay the truth; this records a landing that already
 happened.
+
+**Prune on `done`:** once an issue lands, remove its leftovers — `git worktree remove` (if a worktree),
+`git branch -d` the local branch, and delete the remote branch if pushed (provider "delete on merge", else
+`git push origin --delete`). Also sweep already-merged leftovers from earlier issues. **Never prune a
+`blocked` / `needs-decision` branch** (local or remote) — that quarantine is a human's to inspect.
 
 ## Dispatch (always via subagents)
 
