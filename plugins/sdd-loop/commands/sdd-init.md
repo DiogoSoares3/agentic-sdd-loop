@@ -34,7 +34,7 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
 
    > **Signal the consequential slots — don't let the user skim past these four.** Most slots have safe
    > defaults, but four carry outsized consequence:
-   > - **Paths** *(most important)* — where `PRD.md` / `ARCHITECTURE.md` / `PROGRESS.md` / the phases dir
+   > - **Paths** *(most important)* — where `PRD.md` / `ARCHITECTURE.md` / `PROGRESS.md` / the phases and ADRs dirs
    >   live. **Everything downstream — the agents, the skills, and the `SessionStart` re-prime + `SubagentStop`
    >   verify hooks — reads these locations from the profile.** If the user wants the main `.md` files outside
    >   `docs/`, set this here (and create the files there in step 2). Keep every path in backticks so the hooks
