@@ -44,5 +44,54 @@ d="$BASE/op-empty"; mk_op "$d"; mkdir -p "$d/epics/phase-1"; : > "$d/epics/phase
 O="$(runVS 'phase 1 opened' "$d")"; ok "opened but EMPTY backlog under epics/ -> BLOCK" 'isblock "$O"'
 
 echo
+echo "== session-start: ABSOLUTE durable-state path =="
+d="$BASE/abs"; mkdir -p "$d/.sdd"; ABS="$BASE/abs-external-state.md"
+printf '## Paths\n- **Durable state:** `%s`\n' "$ABS" > "$d/.sdd/profile.md"
+cursor 7 none E7-1 none > "$ABS"
+OUT="$(CLAUDE_PROJECT_DIR="$d" bash "$SS" </dev/null | jq -r '.hookSpecificOutput.additionalContext' 2>/dev/null)"
+ok "reads an absolute durable-state path (Phase 7 / Next E7-1)" 'printf "%s" "$OUT" | grep -q "Phase: 7 | Doing: none | Next: E7-1"'
+
+echo "== session-start: partial Paths (Phases dir set, Durable state absent) -> docs/ fallback =="
+d="$BASE/partial"; mkdir -p "$d/.sdd" "$d/docs"
+printf '## Paths\n- **Phases dir:** `epics/`\n' > "$d/.sdd/profile.md"   # no Durable state line
+cursor 2 P2-1 P2-2 none > "$d/docs/PROGRESS.md"
+OUT="$(CLAUDE_PROJECT_DIR="$d" bash "$SS" </dev/null | jq -r '.hookSpecificOutput.additionalContext' 2>/dev/null)"
+ok "missing Durable-state line -> falls back to docs/PROGRESS.md (Phase 2 / Doing P2-1)" 'printf "%s" "$OUT" | grep -q "Phase: 2 | Doing: P2-1"'
+
+echo "== session-start: non-bold / oddly-spaced Paths line still parsed =="
+d="$BASE/fmt"; mkdir -p "$d/.sdd" "$d/place"
+printf '## Paths\n-   Durable state :   `place/st.md`\n' > "$d/.sdd/profile.md"
+cursor 4 none E4-9 none > "$d/place/st.md"
+OUT="$(CLAUDE_PROJECT_DIR="$d" bash "$SS" </dev/null | jq -r '.hookSpecificOutput.additionalContext' 2>/dev/null)"
+ok "parses a non-bold, extra-spaced Durable-state line (Next E4-9)" 'printf "%s" "$OUT" | grep -q "Phase: 4 | Doing: none | Next: E4-9"'
+
+echo "== verify-subagent: DEFAULT phases dir (docs/phases) fallback =="
+d="$BASE/vdef-ok"; mkdir -p "$d/.sdd" "$d/docs/phases/phase-1"; printf 'integrity: prose+git\n' > "$d/.sdd/profile.md"  # no Paths section
+printf -- '- FR-1: x\n' > "$d/docs/phases/phase-1/backlog.md"
+O="$(runVS 'phase 1 opened · 1 issue' "$d")"; ok "no Paths section, backlog under docs/phases -> ALLOW" '! isblock "$O"'
+d="$BASE/vdef-none"; mkdir -p "$d/.sdd" "$d/docs/phases"; printf 'integrity: prose+git\n' > "$d/.sdd/profile.md"
+O="$(runVS 'phase 1 opened · 3 issues' "$d")"; ok "no Paths section, NO backlog under docs/phases -> BLOCK" 'isblock "$O"'
+
+echo "== END-TO-END: a fully-relocated project (spec/ tree) through BOTH hooks =="
+d="$BASE/e2e"; mkdir -p "$d/.sdd" "$d/spec/phases/phase-1" "$d/spec/adrs"
+cat > "$d/.sdd/profile.md" <<'PROF'
+## Loop
+- Continuation mode: auto
+## Paths
+- **Phases dir:** `spec/phases/`
+- **Durable state:** `spec/state.md`
+- **Baselines:** `spec/PRD.md` · `spec/ARCHITECTURE.md` · `spec/adrs/`
+PROF
+cursor 5 none E5-1 none > "$d/spec/state.md"
+printf -- '- E5-1: relocated slice\n' > "$d/spec/phases/phase-1/backlog.md"
+OUT="$(CLAUDE_PROJECT_DIR="$d" bash "$SS" </dev/null | jq -r '.hookSpecificOutput.additionalContext' 2>/dev/null)"
+ok "session-start reads spec/state.md (Phase 5 / Next E5-1)" 'printf "%s" "$OUT" | grep -q "Phase: 5 | Doing: none | Next: E5-1"'
+ok "session-start echoes the relocated durable-state path"    'printf "%s" "$OUT" | grep -q "spec/state.md"'
+ok "session-start recommends dispatch (not re-plan)"          'printf "%s" "$OUT" | grep -qi "SELECT and dispatch the Next"'
+O="$(runVS 'phase 1 opened · 1 issue' "$d")"; ok "verify reads spec/phases backlog -> ALLOW" '! isblock "$O"'
+rm -rf "$d/spec/phases/phase-1"; mkdir -p "$d/spec/phases"
+O="$(runVS 'phase 1 opened · 1 issue' "$d")"; ok "verify: relocated phases now empty -> BLOCK" 'isblock "$O"'
+
+echo
 printf "== %d passed, %d failed ==\n" "$PASS" "$FAIL"
 rm -rf "$BASE"; [ "$FAIL" -eq 0 ]
