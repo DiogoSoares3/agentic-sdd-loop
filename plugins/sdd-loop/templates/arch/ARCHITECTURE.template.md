@@ -5,6 +5,15 @@
 > Decisions here generally trace to the FR/NFR/régua they serve; the product *what/why* is referenced, not
 > duplicated. A living document — update it when a decision closes; keep discarded alternatives.
 
+## System context — level, scale & operability
+The application's **level** (prototype/PoC · MVP · production) and the **scale/operability** it must meet —
+**realizing the PRD's NFRs** (load, SLA, scalability, operability), referenced by ID, not restated. Let the
+level **size** everything below: the deployment / delivery / infrastructure / tooling shape is designed
+**proportional to it — only what this project actually needs**, and skipped where it doesn't fit (a
+prototype may be a single sentence). The **architecture style** (if the project has one) is captured in the
+Overview or an ADR **only if it fits**. Conventions, design patterns and coding best practices are **not**
+here — they live in the project's `CLAUDE.md`.
+
 ## Overview
 The shape of the solution in a few sentences.
 

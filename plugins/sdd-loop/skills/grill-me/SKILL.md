@@ -23,7 +23,9 @@ repo may have nothing — then grill from the PRD + régua.)
 
 1. **Author a missing `PRD.md` (with the stakeholder).** The repo has no product truth to synthesize.
    Interview the stakeholder down the tree — problem, **personas and each persona's user stories**, scope
-   of v1, requirements, definition of done, out-of-scope — then hand off to **`/to-prd`** to write `PRD.md`
+   of v1, requirements — **including the app's level & scale as NFRs** (e.g. PoC vs MVP vs production;
+   expected load — users / RPS / volume; SLA, data & privacy/compliance; scalability & operability —
+   *whichever fit this project*), definition of done, out-of-scope — then hand off to **`/to-prd`** to write `PRD.md`
    (which fills the **Personas & user stories** section, every persona with at least one story). It still
    needs **stakeholder validation** before the spec gate opens.
 2. **Author a missing `ARCHITECTURE.md` (with the engineer).** It **realizes the validated `PRD.md`** — one
@@ -34,7 +36,16 @@ repo may have nothing — then grill from the PRD + régua.)
    conflicts is a `needs-revalidation` back to the stakeholder. For an existing repo, **start by exploring
    the codebase** — its current structure, key modules, and where behaviour is already intercepted — so
    every proposal (decisions, seams, folder layout) is grounded in what's actually there, not invented in a
-   vacuum; for a greenfield repo there's little to read, so propose from the PRD + régua. Interview the
+   vacuum; for a greenfield repo there's little to read, so propose from the PRD + régua.
+   **Start from the system context, sized to the project's level — only if it fits.** Establish the
+   application's **level and scale** by realizing the PRD's NFRs (level, load, SLA, scalability,
+   operability); if a scale that matters isn't in the PRD, flag it to flow up — don't invent product scope.
+   Let that level **size** how much operational shape to design (deployment, delivery, infrastructure,
+   tooling) — **proportional, only what this project actually needs**, skipped where it doesn't fit (a
+   prototype needs almost none; a production system more). Capture the **architecture style only if it fits**
+   the project (a real, hard-to-reverse fork → an ADR). **Conventions, design patterns and coding best
+   practices do NOT go in `ARCHITECTURE.md` or the ADRs — they live in the project's `CLAUDE.md`** (the
+   user's ambient conventions); only a *structural* decision becomes an ADR. Interview the
    engineer for the technical truth — the **seams** (highest, fewest), the **test mechanism**, components,
    the key decisions, and the
    **repository/directory/script structure** (map an existing layout and sanity-check it makes sense, or
