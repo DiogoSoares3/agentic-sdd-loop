@@ -87,7 +87,7 @@ CONTEXT="$(
   printf '%s\n' "$DIRECTIVE"
   printf '%s\n' ""
   printf '%s\n' "Before acting: re-read .sdd/profile.md, $PROGRESS_REL, the current phase PRD + backlog;"
-  printf '%s\n' "reconcile any landed issues to done; consult docs/adrs/ before any architectural decision"
+  printf '%s\n' "reconcile any landed issues to done; consult the ADRs directory before any architectural decision"
   printf '%s\n' "(uncovered -> escalate as needs-decision); dispatch through sdd-phase-opener / sdd-issue-worker."
   if [ -f "$PROGRESS" ]; then
     printf '%s\n' "--- $PROGRESS_REL (full durable state) ---"

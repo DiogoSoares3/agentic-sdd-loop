@@ -50,6 +50,10 @@ down; change flows up only as a controlled amendment (see *Change control*).
 
 Do not re-derive what these already record. Keep dynamic state in `PROGRESS.md`, not in your head.
 
+> **Paths are the profile's, not hardcoded.** Every `docs/…` path in this skill is a **default** — the
+> profile's **Paths** section (Baselines / Durable state / Phases dir / ADRs) governs the real locations; a
+> project may relocate them out of `docs/`. Read them from the profile.
+
 ## The state machine
 
 You are always in exactly one of these states. Decide which from `PROGRESS.md`, then act.

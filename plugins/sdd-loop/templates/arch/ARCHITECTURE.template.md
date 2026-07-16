@@ -48,7 +48,8 @@ one, **propose the initial layout**. Either way it is **validated with the user*
 shape of the repo is a decision, not an accident. Folder/module altitude, not a file-by-file dump.
 
 ## Key decisions (ADRs)
-Index of closed decisions → link to `docs/adrs/`. Each ADR names the discarded alternative and why.
+Index of closed decisions → link to each ADR in the repo's ADRs directory. Each ADR names the discarded
+alternative and why.
 
 ## Discarded alternatives
 | Considered | Rejected because |

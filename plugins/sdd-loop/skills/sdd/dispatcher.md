@@ -74,7 +74,8 @@ Paths, not contents — the worker reads them itself:
 
 Do **not** hand it the full backlog, unrelated phases, or the whole PRD. If it needs another **existing**
 spec file, it **reads it itself** — the orchestrator is not a file server, only an escalation resolver.
-(`CLAUDE.md` conventions are ambient — inherited by the subagent, not packed.)
+(`CLAUDE.md` conventions are ambient — inherited by the subagent, not packed.) Every `docs/…` path here is a
+**default** — the profile's **Paths** section governs the real locations (a project may relocate them).
 
 ## Git strategy (branch-per-issue)
 
