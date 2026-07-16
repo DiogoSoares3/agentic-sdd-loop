@@ -84,7 +84,8 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
      session death.
    - **Backlog review** — `auto` (default; the cut phase backlog goes straight to build) or `confirm`
      (a **one-time** pause after `/to-issues` to approve/edit the backlog + how issues run, then build
-     proceeds straight through — it does **not** re-pause before each issue).
+     proceeds straight through — it does **not** re-pause before each issue, though a `blocked` /
+     `needs-decision` / `needs-revalidation` escalation still halts the loop for a human).
    - **Integrity enforcement** — `prose+git +hook` (**default**): the base (`prose+git`: immutable scenario,
      RED proof, test-first commit, clean re-run) **plus** the shipped `PreToolUse` guard (`+hook`: on an
      `issue/*` branch, deny an implementation edit until a **behaviour/BDD test** is committed — this gates

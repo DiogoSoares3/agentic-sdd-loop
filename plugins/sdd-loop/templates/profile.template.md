@@ -83,7 +83,8 @@ The exact command(s) that prove a slice green.
 - **Backlog review (gate at PLAN, before BUILD):** governs the human gate on the *derived scope* of a phase.
   - `auto` (**default**) — the `sdd-phase-opener`'s cut goes straight to BUILD.
   - `confirm` — a **one-time** pause after the backlog is cut: the user **approves/edits the phase scope + how
-    the issues will run**, then BUILD proceeds straight through **without pausing per issue**. The two
+    the issues will run**, then BUILD proceeds straight through **without pausing per issue** (a worker's
+    `blocked` / `needs-decision` / `needs-revalidation` still halts it for a human). The two
     baselines stay the only human-validated docs; this is an optional gate on the
     derived layer.
   Orthogonal to Continuation mode: this gates *what gets built* (the plan); Continuation gates *whether to

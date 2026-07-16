@@ -137,7 +137,8 @@ sent back). The steps it follows:
   `confirm` **pauses** here and surfaces the freshly-cut backlog for the user to approve/edit before any
   build — an opt-in human gate on the *derived* layer (the two baselines are still the only grilled docs).
   It is a **one-time** gate: confirm the backlog + how the issues will run **once**, then BUILD runs straight
-  through them **without pausing before each issue** (the loop may still surface something on its own).
+  through them **without pausing before each issue** — a worker's `blocked` / `needs-decision` /
+  `needs-revalidation` still **halts** the loop for a human, and the loop may surface something on its own.
 
 ### BUILD phase → dispatch issues one at a time
 The build loop is the **issue dispatcher** — read [`dispatcher.md`](dispatcher.md); it is the loop's
@@ -220,8 +221,10 @@ dispatch is always via subagents). Either way the `SessionStart` hook has alread
 
 - **`ask` (default):** at a **boundary or on re-entry** (phase drained, a resume/compaction, or a stop) —
   **not** before each intra-phase issue — **present the cursor + recommended action and ask whether to
-  continue**, then wait. Within a phase the loop dispatches issues **consecutively** without re-asking. The
-  supervised default: the loop never silently barrels past a *boundary*.
+  continue**, then wait. Within a phase the loop dispatches issues **consecutively** without re-asking —
+  **except** a worker that returns `blocked` / `needs-decision` / `needs-revalidation`, which **always halts
+  the loop for a human** (below), whatever the mode. The supervised default: the loop never silently barrels
+  past a *boundary*.
 - **`auto`:** the orchestrator keeps dispatching bounded `sdd-issue-worker` subagents without asking; its own
   overflow is caught by the `SessionStart` re-prime + the `/loop` driver — no human, and **no flat
   supervisor** (that pattern is retired: it put the long-running coordinator inside a subagent, which
