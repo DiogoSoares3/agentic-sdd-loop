@@ -41,8 +41,11 @@ echo "########## SCENARIO 1 — PLAN + Touches ##########"
 run_scenario fixture-plan.sh     plan-chain.sh;    r1=$?
 echo; echo "########## SCENARIO 2 — RESOLVE conflict ##########"
 run_scenario fixture-parallel.sh resolve-chain.sh; r2=$?
+echo; echo "########## SCENARIO 3 — MULTI-ITEM land queue ##########"
+run_scenario fixture-multi.sh    multi-chain.sh;   r3=$?
 
 echo; echo "########## SUMMARY ##########"
-[ "$r1" -eq 0 ] && echo "PLAN+Touches: PASS" || echo "PLAN+Touches: FAIL"
-[ "$r2" -eq 0 ] && echo "RESOLVE conflict: PASS" || echo "RESOLVE conflict: FAIL"
-[ "$r1" -eq 0 ] && [ "$r2" -eq 0 ]
+[ "$r1" -eq 0 ] && echo "PLAN+Touches: PASS"      || echo "PLAN+Touches: FAIL"
+[ "$r2" -eq 0 ] && echo "RESOLVE conflict: PASS"  || echo "RESOLVE conflict: FAIL"
+[ "$r3" -eq 0 ] && echo "MULTI-item queue: PASS"  || echo "MULTI-item queue: FAIL"
+[ "$r1" -eq 0 ] && [ "$r2" -eq 0 ] && [ "$r3" -eq 0 ]

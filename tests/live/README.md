@@ -67,6 +67,11 @@ bash tests/live/parallel/run-bwrap.sh     # Linux (bwrap); macOS: adapt run-maco
    landed and `issue/2-subtract` is ready-to-land but conflicts on the shared registry line. The orchestrator
    **dispatches `sdd-merge-resolver`**, which **invokes `/resolving-merge-conflicts`**; `develop` ends with
    **both** ops, the **full suite is green (2 passed)**, and the **landed `add` test is not weakened**.
+3. **MULTI-item land queue** (`fixture-multi.sh` — three independent `ready-to-land` branches +
+   `multi-chain.sh`): `add`/`subtract`/`multiply` all edit the shared registry line, so draining the queue
+   forces a cascade of conflicts. Verifies the orchestrator dispatches **one lander per queue item, in
+   backlog order, serially**; all three land green (**3 passed**), no landed test weakened. (Validated: 3
+   distinct landers, order add→subtract→multiply, linear ff history.)
 
 > These are ambitious single-session live flows; Haiku can need a rerun (its headless git handling is
 > flaky). The **deterministic** proof of the same mechanics — the conflict is real, a correct resolution
