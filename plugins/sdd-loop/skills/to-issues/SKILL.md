@@ -108,6 +108,13 @@ is **mandatory**. The **outer BDD scenario is always required** — this flag ne
 
 Or "None - can start immediately" if no blockers.
 
+## Touches (parallel-safety hint — optional)
+
+The files / modules / seam this slice is expected to change, in broad strokes (folder/module altitude, not a
+file list). It lets the orchestrator co-dispatch only **disjoint** slices when the profile's `Concurrency`
+knob is `parallel`; omit it — or when uncertain — and the loop serializes to stay safe. A hint, not a
+contract. Skip it entirely for `serial` projects.
+
 </issue-template>
 
 Do NOT modify the source plan/PRD.

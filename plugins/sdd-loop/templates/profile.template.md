@@ -71,9 +71,19 @@ Two scopes (they may be the same command in a small project):
   outer behaviour test using the seam/mechanism named in `ARCHITECTURE.md`/ADRs. No matrix here — the
   arch doc owns "how a behaviour is tested in this project".
 - **Dispatch (fixed — always subagents):** the main-session orchestrator spawns a fresh **`sdd-issue-worker`**
-  per issue (optionally in its own git worktree on the issue branch) and a bounded **`sdd-phase-opener`** to
-  cut each phase. Not a knob — the whole architecture (coordinator in the main session, bounded leaves in
-  subagents) depends on it. See the dispatcher spec.
+  per issue (optionally in its own git worktree on the issue branch), a bounded **`sdd-phase-opener`** to
+  cut each phase, and a bounded **`sdd-merge-resolver`** to resolve a conflicting branch. Not a knob — the
+  whole architecture (coordinator in the main session, bounded leaves in subagents) depends on it. See the
+  dispatcher spec.
+- **Concurrency (how many issues build at once):**
+  - `serial` (**default**) — one issue at a time; the worker lands its own branch in the same dispatch. No
+    cross-branch conflict is possible. Prefer this unless the backlog has many genuinely-independent slices.
+  - `parallel` — opt-in: the orchestrator may co-dispatch workers for issues that are all-blockers-`done`
+    **and** touch **disjoint files/seams**; workers build to green and return `ready-to-land` **without
+    merging**. The orchestrator then drains a **serial land queue** by dispatching a bounded
+    `sdd-merge-resolver` per item (one at a time) that rebases onto the current tip, resolves a conflict only
+    if one arises, runs the regression gate, and merges — the coordinator never runs the suite or merges itself.
+    Only safe *because* the land is serialized — build parallel, land serial.
 - **Continuation mode (gate at a boundary / on resume):** governs what the orchestrator does when the loop
   reaches a boundary or re-enters after a compaction/crash — **not** who holds context (dispatch is always
   via subagents).
@@ -127,7 +137,9 @@ Two scopes (they may be the same command in a small project):
     landing, so the default config is never unprotected.
   A failure here never weakens a test — it re-opens the issue to fix the **code** (a genuine behaviour
   change escalates as `needs-revalidation`).
-- **Backlog statuses:** `todo → doing → done` (auto-merge) · `todo → doing → in-review → done` (human-review).
+- **Backlog statuses:** `todo → doing → done` (serial auto-merge) · `todo → doing → ready-to-land → done`
+  (parallel auto-merge — `ready-to-land` = green + pushed, awaiting the orchestrator's serial land queue) ·
+  `todo → doing → in-review → done` (human-review).
 
 ## Paths
 > **Load-bearing — every downstream tool + hook reads artifact locations from here.** Relocate the baselines /

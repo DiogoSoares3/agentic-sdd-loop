@@ -11,7 +11,7 @@ explains everything**:
 Everything below follows from that. Get it right and the loop survives compaction, resumes from files, and
 never games its own test.
 
-## The three roles
+## The roles
 
 ```
 MAIN SESSION = the phase orchestrator   (you, running /sdd; re-driven by /loop)
@@ -20,25 +20,32 @@ MAIN SESSION = the phase orchestrator   (you, running /sdd; re-driven by /loop)
 │  • spawns bounded subagents; relays their status; handles escalation via /grill-me
 │  • each subagent's exit is checked by the SubagentStop guard (verify, not coordinate)
 │
-├─ PLAN a phase  →  spawn  [sdd-phase-opener]   (agents/phase-opener.md — bounded, one phase)
-│                     └─ writes docs/phases/phase-N/prd.md + backlog.md → returns status
+├─ PLAN a phase     →  spawn [sdd-phase-opener]  (agents/phase-opener.md — bounded, one phase)
+│                        └─ writes docs/phases/phase-N/prd.md + backlog.md → returns status
 │
-└─ BUILD an issue →  spawn [sdd-issue-worker]   (agents/issue-worker.md — bounded, ONE issue)
-                      └─ runs the double loop, lands per merge policy → returns report
+├─ BUILD an issue   →  spawn [sdd-issue-worker]  (agents/issue-worker.md — bounded, ONE issue)
+│                        └─ runs the double loop; lands (serial) or returns ready-to-land (parallel)
+│
+└─ LAND a queued branch →  spawn [sdd-merge-resolver]  (agents/merge-resolver.md — bounded, ONE branch)
+                            └─ rebase → resolve conflict IF any → FULL regression suite → merge → done → returns status
 ```
 
 - **Orchestrator (main session).** Its loop: re-prime → read state → spawn the right subagent for the next
-  step → receive one compact status/report → update `PROGRESS.md` + backlog → continue or stop at a gate.
-  It **never** builds an issue itself in `subagent` mode; it dispatches. It **never** nests — only the main
-  session spawns.
+  step → receive one compact status/report → update `PROGRESS.md` + backlog → continue or stop at a gate. In
+  parallel mode it also **owns the serial land queue** (below). It **never** builds an issue itself in
+  `subagent` mode; it dispatches. It **never** nests — only the main session spawns.
 - **`sdd-phase-opener`.** One bounded spawn per phase: derive the next epic from the validated baselines +
   ADRs, write the phase PRD + backlog (issues with a Gherkin `Scenario:` and the `Inner loop (TDD)` flag).
   Builds nothing. Fits one window.
-- **`sdd-issue-worker`.** One bounded spawn per issue: the double loop to green, land per merge policy,
-  return the report. One issue fits one window — which is exactly why it is a subagent.
+- **`sdd-issue-worker`.** One bounded spawn per issue: the double loop to green, then land (serial mode) or
+  return `ready-to-land` (parallel mode). One issue fits one window — which is exactly why it is a subagent.
+- **`sdd-merge-resolver`.** One bounded spawn per land-queue item: rebase a `ready-to-land` branch onto the
+  current integration tip, resolve a conflict via `/resolving-merge-conflicts` **only if one arises**, run
+  the **full** regression suite, merge to `done`, return the outcome. Dispatched for **every** land (conflict
+  or not) — the heavy rebase + suite + merge stays OUT of the main context.
 
 Dispatch is **always** via subagents — the whole shape (coordinator in the main session, bounded leaves in
-subagents) depends on it, so it is not a knob. Both bounded agents fit one window by design.
+subagents) depends on it, so it is not a knob. Every bounded agent fits one window by design.
 
 ## Deterministic context — injected, not requested
 
@@ -57,7 +64,8 @@ context deterministically:
 
 > These hooks are shipped in `hooks/` and are **self-gating**: silent no-op outside an SDD project; the
 > test-first `PreToolUse` guard only bites when the profile sets `integrity: +hook`; the `SubagentStop`
-> verify guard only acts on our two bounded agents and fails open otherwise. (Hook↔subagent lifecycle
+> verify guard only acts on the two agents it verifies (`sdd-phase-opener` / `sdd-issue-worker`; the
+> `sdd-merge-resolver` is not verified, fail-open) and fails open otherwise. (Hook↔subagent lifecycle
 > semantics — esp. that `SessionStart` is main-session-only, `PreToolUse`/`SubagentStop` fire for subagents,
 > and subagents get no compaction hook so they compact silently — are per current Claude Code docs; confirm
 > empirically on your host, they are load-bearing.)
@@ -92,16 +100,18 @@ a second branch. Two knobs:
     is **non-blocking** — it moves to the next issue whose blockers are `done`; a human merge flips it to `done`.
 
 ```
-auto-merge:    todo → doing → done
-human-review:  todo → doing → in-review (PR open, green) → done (PR merged)
+auto-merge (serial):    todo → doing → done
+auto-merge (parallel):  todo → doing → ready-to-land → done   (a bounded lander merges, one at a time)
+human-review:           todo → doing → in-review (PR open, green) → done (PR merged)
 ```
 
-**Selection always requires every blocker to be `done`** (landed on the integration branch).
+**Selection always requires every blocker to be `done`** (landed on the integration branch). A blocker in
+`ready-to-land` is **not** `done` — a dependent cannot start until that blocker actually lands.
 
-**Reconcile on prime (both policies):** at the start of every orchestration tick, mark any `in-review`/`doing`
-issue whose work is already in the integration branch as `done` (check `gh pr view`, or `git branch
---merged` / log for the `issue/<id>` commits). Files stay the truth; this records a landing that already
-happened.
+**Reconcile on prime (all policies):** at the start of every orchestration tick, mark any
+`in-review`/`ready-to-land`/`doing` issue whose work is already in the integration branch as `done` (check
+`gh pr view`, or `git branch --merged` / log for the `issue/<id>` commits). Files stay the truth; this
+records a landing that already happened.
 
 **Prune on `done`:** once an issue lands, remove its leftovers — `git worktree remove` (if a worktree),
 `git branch -d` the local branch, and delete the remote branch if pushed (provider "delete on merge", else
@@ -163,8 +173,42 @@ place, then return claiming success. Three layers guard this, in order of levera
 ### Isolation (worktrees)
 One issue = one worktree = one branch makes the integrity guards mechanical: the clean re-run runs against a
 fresh checkout; the test-first two-commit rule is auditable on the branch diff; a `blocked` issue never
-lands (discard the worktree, the integration branch stays pristine). Default to **one issue at a time**; do
-not run worktrees in parallel unless throughput genuinely demands it.
+lands (discard the worktree, the integration branch stays pristine). The profile's **`Concurrency`** knob
+picks the shape: **`serial` (default) — one issue at a time**, the worker lands its own branch in the same
+dispatch (simplest, no cross-branch conflict possible). **`parallel` — opt-in**, only when throughput truly
+demands it, and only *safe* with the serial land queue below.
+
+### Parallel mode — build parallel, land serial (the merge queue)
+The failure parallel invites is **many workers racing to merge into a moving `develop`** — each rebases onto
+what another just changed, and the resolutions thrash without converging. The fix is not to parallelize the
+merge; it is to **serialize the land**:
+
+- **Build parallel, land serial.** The orchestrator may co-dispatch several workers **only** for issues that
+  are all-blockers-`done` **and** touch **disjoint files/seams** (read each issue's optional *Touches* hint;
+  when overlap is unknown, serialize — the safe default). Workers build to green but **do not merge** — each
+  returns **`ready-to-land`** with its branch pushed.
+- **The land queue (orchestrator-owned) — a derived view of the backlog, not a separate structure.** The
+  queue *is* the set of issues whose backlog status is **`ready-to-land`**; it is recomputed from the
+  backlog file every tick (files-are-truth — there is no in-memory queue to lose on a crash). The
+  orchestrator drains it **one at a time**, **dependency-first, then in backlog order** (the backlog is
+  written blockers-first, so no timestamp is needed — first-ready-by-position wins). Ordering is by
+  dependency + arrival, **not** by ease of resolution — a branch's conflict is only discovered at rebase
+  time and shifts as each land moves the tip, so it cannot be pre-sorted.
+- **The land itself is DELEGATED — the coordinator never rebases, runs the suite, or merges in its own
+  context.** For each queue item the orchestrator spawns a bounded **`sdd-merge-resolver`** that takes that
+  ONE branch to `done`: rebase onto the **current** integration tip → **resolve a conflict via
+  `/resolving-merge-conflicts` only if one arises** → **regression-gate** (full suite) → merge → mark `done`.
+  The rebase + full suite + merge is exactly the heavy, context-bloating work that must live in a disposable
+  leaf, not the long-running coordinator — so it is dispatched for **every** land, conflict or not. The
+  orchestrator's job is only to **serialize** (one lander at a time, so every rebase is against a settled tip
+  → conflicts are sequential and single-owner, never a mutual scramble) and to **record** the report
+  (`landed` → `done` + prune; `needs-revalidation` for a genuine behaviour collision the specs don't
+  adjudicate — never a silent side-pick, never by weakening a landed test). Under `human-review` the
+  provider/human is the serialization point; the orchestrator still dispatches the lander to hand back a
+  cleanly-rebased PR when one goes un-mergeable.
+
+Serial mode needs none of this — with one land in flight there is no moving target. Prefer it unless the
+backlog has many genuinely-independent slices.
 
 ## Per-issue procedure (the double loop) — carried by `sdd-issue-worker`
 
@@ -178,8 +222,9 @@ INNER  (TDD — only if `Inner loop (TDD)` is `required`)  unit → minimal code
        When `skipped`: minimal implementation to make the OUTER test green — no inner loop; other guards hold.
 CLOSE  (slice-gate) inner units green (n/a if skipped) AND outer green AND phase DoD items pass (profile
        SLICE command) AND a CLEAN re-run, assertions unchanged-or-stronger vs the RED snapshot.  [#4]  Refactor while green.
-POST   LAND per merge policy — the REGRESSION-gate runs at this merge (CI, or the local full-suite command
-       when provider `none`); auto-merge → done on green | human-review → in-review + PR URL.  [#5]
+POST   SERIAL: LAND per merge policy — the REGRESSION-gate runs at this merge (CI, or the local full-suite
+       command when provider `none`); auto-merge → done on green | human-review → in-review + PR URL.  [#5]
+       PARALLEL: do not merge — push + return `ready-to-land`; the orchestrator lands it via a bounded lander.
        Update PROGRESS worklog + next issue. subagent: discard the worktree. Return the report.
 ```
 
@@ -230,7 +275,10 @@ Existing files a worker merely *lacks in context* are **not** escalations — it
 
 ## Report-back contract (what a dispatch returns)
 
-- **Outcome:** `green` (landed `done` / PR `in-review`) | `blocked` | `needs-decision` | `needs-revalidation`.
+- **Outcome (issue-worker):** `green` (serial: landed `done` / PR `in-review`) | `ready-to-land` (parallel:
+  green + pushed, awaiting the orchestrator's serial land) | `blocked` | `needs-decision` | `needs-revalidation`.
+- **Outcome (merge-resolver):** `landed` (rebased, conflict resolved if any, full suite green, merged → `done`) | `needs-revalidation`
+  | `needs-decision` | `blocked`.
 - **Scenario status:** outer pass/fail; inner test count (`n/a` when `skipped`).
 - **Changes:** files touched, test-command output (green proof), merge/PR ref.
 - **PROGRESS delta:** worklog line + next issue.
@@ -239,16 +287,19 @@ The orchestrator **relays what matters** to the user (a subagent's final message
 
 ## Idempotency & resume
 
-State lives in **files**, never in agent memory: backlog status (`todo`/`doing`/`in-review`/`done`) +
-`PROGRESS.md` are the single source of truth. Recovery after a crash/compaction:
+State lives in **files**, never in agent memory: backlog status
+(`todo`/`doing`/`ready-to-land`/`in-review`/`done`) + `PROGRESS.md` are the single source of truth. The
+parallel land queue is **not** held in memory — it is the backlog filtered to `ready-to-land`, so a crash
+loses nothing. Recovery after a crash/compaction:
 
-1. **Reconcile:** any `in-review`/`doing` issue already landed → `done`.
-2. **Resume:** an issue stuck in `doing` is the one to resume — its `issue/<id>-…` branch exists, so
-   attach to it rather than re-branching.
+1. **Reconcile:** any `in-review`/`ready-to-land`/`doing` issue already merged into the integration branch → `done`.
+2. **Resume:** an issue stuck in `doing` is the one to resume its **build** — attach to its `issue/<id>-…`
+   branch rather than re-branching. An issue in `ready-to-land` (green, unmerged) re-enters the **land
+   queue** (rebase → regression-gate → merge), **not** a rebuild.
 3. **Continue from actual git/test state:** if the branch already has commits, run the test command to read
    red/green and pick up there — do **not** demand a fresh RED. Re-landing a landed branch is a no-op.
 
-Because a dispatch is atomic (one issue, marked `doing`→`done`/`in-review`), replay never double-lands.
+Because a dispatch is atomic (one issue, marked `doing`→`ready-to-land`/`done`/`in-review`), replay never double-lands.
 
 ## The gate (after every dispatch)
 

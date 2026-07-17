@@ -59,13 +59,20 @@ CLOSE        (slice-gate — proves THIS issue)
              - re-run from a CLEAN checkout; assertions unchanged-or-stronger vs the RED snapshot —
                a weakened-but-green test FAILS the dispatch                                          [#4]
              - refactor while green
-LAND         per the profile's merge policy — the REGRESSION-gate runs at this merge (the profile's
-             full-suite/regression command over the WHOLE suite):                                   [#5]
-             - auto-merge:   provider → open+merge PR, the provider's checks are the regression-gate;
-                             none → run the full-suite command locally, then merge into develop. Mark
-                             the issue `done` only once that gate is green.
-             - human-review: push + open a PR into develop (scenario + green proof in the body); CI on the
-                             PR is the regression-gate. Mark `in-review`, record the PR URL. A human merges.
+LAND         DEPENDS on the profile's `Concurrency` knob:                                           [#5]
+             - PARALLEL:  do NOT merge. Push your `issue/*` branch, set the issue's **backlog status to
+                          `ready-to-land`**, and return — that status IS the land queue (the orchestrator
+                          recomputes it from the backlog each tick and drains it serially by dispatching a
+                          bounded lander per item: rebase → resolve-if-conflict → regression-gate → merge →
+                          `done`), so parallel branches never race a moving `develop`.
+             - SERIAL (default):  land per the profile's merge policy — the REGRESSION-gate runs at this
+                          merge (the profile's full-suite/regression command over the WHOLE suite):
+                          - auto-merge:   provider → open+merge PR, the provider's checks are the regression-gate;
+                                          none → run the full-suite command locally, then merge into develop.
+                                          Mark the issue `done` only once that gate is green.
+                          - human-review: push + open a PR into develop (scenario + green proof in the body);
+                                          CI on the PR is the regression-gate. Mark `in-review`, record the
+                                          PR URL. A human merges.
 ```
 
 ## Integrity — the test is the spec, not a target to move (immutable to you)
@@ -95,7 +102,8 @@ LAND         per the profile's merge policy — the REGRESSION-gate runs at this
   for the human; do not silently amend a baseline.
 
 ## Return (report contract — the orchestrator relays it to the user)
-- **Outcome:** `green` (landed `done` under auto-merge, or PR `in-review` under human-review) | `blocked` |
+- **Outcome:** `green` (serial: landed `done` under auto-merge, or PR `in-review` under human-review) |
+  `ready-to-land` (parallel: green + branch pushed, awaiting the orchestrator's serial land) | `blocked` |
   `needs-decision` | `needs-revalidation`.
 - **Scenario status:** outer behaviour test pass/fail; inner test count (`n/a` when `skipped`).
 - **Changes:** files touched, test-command output (the green proof), and the merge/PR ref.

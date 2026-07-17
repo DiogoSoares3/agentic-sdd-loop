@@ -10,7 +10,7 @@
 # It also turns "did the worker actually do BDD/TDD?" from trust into a check: the BDD outer
 # test must be committed on the issue branch (always required, even for TDD-`skipped` issues).
 #
-# Covers BOTH bounded agents:
+# Covers the two bounded agents it verifies (sdd-merge-resolver is intentionally not verified -> fail-open):
 #   - sdd-issue-worker : claims green  -> its issue/* branch must carry a committed test.
 #   - sdd-phase-opener : claims opened -> a non-empty backlog.md must exist under docs/phases/.
 #
@@ -35,7 +35,7 @@ AGENT="$(printf '%s' "$INPUT" | jq -r '.agent_type // empty')"
 CWD="$(printf '%s'   "$INPUT" | jq -r '.cwd // empty')"
 MSG="$(printf '%s'   "$INPUT" | jq -r '.last_assistant_message // empty')"
 
-# Only our two bounded agents (accept bare or plugin-scoped name, e.g. sdd-loop:sdd-issue-worker).
+# Only the two bounded agents it verifies (accept bare or plugin-scoped name, e.g. sdd-loop:sdd-issue-worker).
 case "$AGENT" in
   *sdd-issue-worker|*sdd-phase-opener) : ;;
   *) exit 0 ;;

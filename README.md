@@ -15,9 +15,9 @@ library, CLI, and so on.
 
 | Layer | What | Ships where |
 |---|---|---|
-| **1. Core methodology** | the invariant SDD+TDD loop — state machine, gates, escalation, dispatcher, the two build subagents, the lifecycle/enforcement hooks | `skills/sdd/*` · `agents/*` · `hooks/*` |
+| **1. Core methodology** | the invariant SDD+TDD loop — state machine, gates, escalation, dispatcher, the three bounded subagents, the lifecycle/enforcement hooks | `skills/sdd/*` · `agents/*` · `hooks/*` |
 | **2. Project profile** | régua, slice, seams, DoD, test command, loop/git knobs | `.sdd/profile.md` *(per repo, via `/sdd-init`)* |
-| **3. Tools** | `/to-prd`, `/to-issues`, `/to-adr`, `/bdd`, `/tdd`, `/handoff`, `/grill-me` (+ builtin `/loop`, `/schedule`) | `skills/*` |
+| **3. Tools** | `/to-prd`, `/to-issues`, `/to-adr`, `/bdd`, `/tdd`, `/handoff`, `/grill-me`, `/resolving-merge-conflicts` (+ builtin `/loop`, `/schedule`) | `skills/*` |
 
 ## How the loop works
 
@@ -74,21 +74,26 @@ MAIN SESSION = phase orchestrator   (you, running /sdd; re-driven by /loop)
 │
 ├─ PLAN a phase  → spawn  [sdd-phase-opener]   reads PRD+ARCH+ADRs → writes phase PRD + backlog → returns
 │
-└─ BUILD, one issue at a time → spawn [sdd-issue-worker]   double loop → land per merge policy → returns report
-        │  (needs an existing ADR/PRD/ARCH? it READS it itself — the orchestrator is not a file server)
-        └─ hits an uncovered structural decision? → returns `needs-decision`
-               → orchestrator runs /grill-me with the human → new ADR / PRD amendment → re-dispatches
+├─ BUILD an issue (serial by default) → spawn [sdd-issue-worker]   double loop → land (serial) or
+│       │  ready-to-land (parallel) → returns report
+│       │  (needs an existing ADR/PRD/ARCH? it READS it itself — the orchestrator is not a file server)
+│       └─ hits an uncovered structural decision? → returns `needs-decision`
+│              → orchestrator runs /grill-me with the human → new ADR / PRD amendment → re-dispatches
+│
+└─ LAND a queued branch (parallel mode) → spawn [sdd-merge-resolver]   rebase → resolve conflict IF any
+        → FULL regression suite → merge → returns `landed` / `needs-revalidation`
 ```
 
-**Two agents** (`agents/`), each self-contained and bounded to one context window:
+**Three agents** (`agents/`), each self-contained and bounded to one context window:
 
 | Agent | Job | Returns |
 |---|---|---|
 | `sdd-phase-opener` | cut ONE phase: derive the epic, write its phase PRD + backlog (scenarios + TDD flags) | `phase N opened · M issues` |
-| `sdd-issue-worker` | build ONE issue to green via the BDD/TDD double loop, land per merge policy | `green` / `blocked` / `needs-decision` / `needs-revalidation` |
+| `sdd-issue-worker` | build ONE issue to green via the BDD/TDD double loop, land per merge policy | `green` / `ready-to-land` / `blocked` / `needs-decision` / `needs-revalidation` |
+| `sdd-merge-resolver` | LAND ONE `ready-to-land` branch (parallel mode): rebase onto the tip, resolve a conflict via `/resolving-merge-conflicts` only if one arises, run the full regression suite, merge to `done` | `landed` / `needs-revalidation` / `needs-decision` / `blocked` |
 
 **Four hooks** (`hooks/`), self-gating (silent no-op outside an SDD project; the `+hook` guard bites only
-when the profile enables it; the `SubagentStop` guard fails open on anything but our two agents) — this is
+when the profile enables it; the `SubagentStop` guard fails open on anything but the two agents it verifies) — this is
 how context injection and enforcement become **deterministic** instead of relying on the agent's
 self-discipline:
 
@@ -247,4 +252,5 @@ in `PROGRESS.md` and drives iterations via `/loop` (or the `auto` supervisor / a
 
 *   **Deterministic Hook Suite (`bash tests/faixa-a.sh`):** Runs the deterministic hook suite with 50 checks, completely independent of any model or network dependencies. It exercises all four core hooks—`SessionStart` re-prime, `PreToolUse` test-first, `PreToolUse` landed-test regression warning, and `SubagentStop` verify—alongside path-awareness tested against real, throwaway git repositories and profiles.
 *   **Sub-suites:** You can also run `tests/subagentstop.sh` and `tests/test-paths.sh` standalone, as these are the specific sub-suites called by the main script.
-*   **Live End-to-End Run (Faixa B):** To run the live end-to-end execution—driven through a real headless model following the `PLAN` → `/compact` → `CONTINUE` flow to verify compaction survival—refer to the `tests/live/` directory. This process requires a token and network access, and is strictly isolated inside **Docker** with the repository mounted as read-only (or via `sandbox-exec` on macOS).
+*   **Parallel / merge-resolver mechanics (`bash tests/parallel-merge.sh`):** A deterministic proof (real `git` + `pytest`, no model) that the `Concurrency: parallel` conflict scenario is sound: two parallel branches really conflict on rebase, a correct resolution makes the **full** suite green, a *weakening* resolution is caught by the regression gate, the landed test stays byte-identical, and the landed-test warning fires. Needs `python3`+`pytest`, so it runs on demand rather than inside `faixa-a.sh`.
+*   **Live End-to-End Run (Faixa B):** To run the live end-to-end execution—driven through a real headless model following the `PLAN` → `/compact` → `CONTINUE` flow to verify compaction survival—refer to the `tests/live/` directory. It needs a logged-in `claude` + network, and is confined by the **OS sandbox**: **bubblewrap** on Linux (`run-bwrap.sh` — `/` read-only, only a throwaway dir writable, `~/.claude` a fresh tmpfs with just the credentials file re-exposed read-only) or **`sandbox-exec`** (seatbelt) on macOS. The `tests/live/parallel/` scenario additionally exercises the `Concurrency: parallel` feature (the merge queue, `sdd-merge-resolver`, and `/resolving-merge-conflicts`).

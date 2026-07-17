@@ -41,6 +41,8 @@ sub-agents**. The job fits one context window by design — cut, write, stop.
      model/experiment work where the outer threshold test is the real gate). The **outer scenario is always
      required** — the flag never disables it. This flag is authored **here** and is immutable to the worker.
    - **Blocked by** — blocker issue ids, in dependency order (blockers first), or "None — can start immediately".
+   - **Touches** (optional parallel-safety hint) — the files/modules/seam the slice changes, coarse; lets the
+     orchestrator parallelize only disjoint slices under `Concurrency: parallel`. Skip it for serial projects.
 4. **Set the resume cursor + compact PROGRESS.** Update the `SDD-CURSOR` block in `docs/PROGRESS.md`:
    `Phase: N`, `Doing: none`, `Next: <first grabbable issue id>`, `Stop-reason: none` — so the orchestrator
    (and the `SessionStart` hook) resume into BUILD at the right issue. **If a prior phase just finished

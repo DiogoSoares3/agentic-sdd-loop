@@ -16,11 +16,13 @@ plugin-agnostic for the same reason.)
 The **invariant spine** is below (Layer 1). The
 **per-project values** (what a slice is, the seams, the *régua*, the test command) live in `.sdd/profile.md`
 (Layer 2) — read it, never hardcode its contents here. The **tools** you call (`/to-prd`, `/to-issues`,
-`/to-adr`, `/bdd`, `/tdd`, `/handoff`, `/grill-me`, `/loop`) are Layer 3. You dispatch bounded work to two subagents —
-**[`sdd-phase-opener`](../../agents/phase-opener.md)** (cut one phase) and
-**[`sdd-issue-worker`](../../agents/issue-worker.md)** (build one issue) — and shipped **hooks** (`hooks/`)
-inject state and enforce test-first deterministically. The **dispatcher** (the loop's bottleneck) is
-specified in [`dispatcher.md`](dispatcher.md) — read it before running the loop.
+`/to-adr`, `/bdd`, `/tdd`, `/handoff`, `/grill-me`, `/loop`, `/resolving-merge-conflicts`) are Layer 3. You
+dispatch bounded work to three subagents — **[`sdd-phase-opener`](../../agents/phase-opener.md)** (cut one
+phase), **[`sdd-issue-worker`](../../agents/issue-worker.md)** (build one issue), and
+**[`sdd-merge-resolver`](../../agents/merge-resolver.md)** (land one queued branch, resolving a conflict if any; parallel mode
+only) — and shipped **hooks** (`hooks/`) inject state and enforce test-first deterministically. The
+**dispatcher** (the loop's bottleneck) is specified in [`dispatcher.md`](dispatcher.md) — read it before
+running the loop.
 
 If `.sdd/profile.md` does not exist, STOP and tell the user to run `/sdd-init` first. If it exists but
 any slot still holds template **placeholder/example** text — a `<…>` token, an unfilled `> e.g.` line
@@ -144,12 +146,15 @@ sent back). The steps it follows:
   through them **without pausing before each issue** — a worker's `blocked` / `needs-decision` /
   `needs-revalidation` still **halts** the loop for a human, and the loop may surface something on its own.
 
-### BUILD phase → dispatch issues one at a time
+### BUILD phase → dispatch issues (serial by default)
 The build loop is the **issue dispatcher** — read [`dispatcher.md`](dispatcher.md); it is the loop's
 critical seam. The **main session is the orchestrator**; each issue runs in a **bounded
 [`sdd-issue-worker`](../../agents/issue-worker.md)** — a fresh subagent per issue (dispatch is always via
 subagents). Every issue is built on **its own branch off the integration branch
-(`develop`)** — the loop never commits to a protected branch. Per issue:
+(`develop`)** — the loop never commits to a protected branch. The profile's **`Concurrency`** knob is
+`serial` by default (one issue at a time, the worker lands its own branch); `parallel` is opt-in and, to
+avoid workers racing a moving `develop`, **builds parallel but lands serial** — see *build parallel, land
+serial* in the dispatcher. Per issue:
 - **Select:** first `todo` issue whose blockers are all `done` (**merged**); mark it `doing` and branch
   `issue/<id>-<slug>` off the freshly-pulled integration branch.
 - **Dispatch the `sdd-issue-worker`** with the minimal context pack as **paths**: `.sdd/profile.md` + `PROGRESS.md` +
@@ -166,13 +171,19 @@ subagents). Every issue is built on **its own branch off the integration branch
   same dispatch (green + passing checks); `human-review` opens a PR and stops at `in-review` until a
   human merges. **The regression-gate (the full accumulated suite) runs at this merge** — the provider's CI
   checks, or the profile's full-suite command locally when the provider is `none`; a failure re-opens the
-  issue to fix the **code** (never a landed test). The dispatch reports back per the contract in
-  `dispatcher.md`. The loop continues, **non-blocking**, to the next issue whose blockers are `done`.
+  issue to fix the **code** (never a landed test). **In `parallel` mode the worker instead returns
+  `ready-to-land` (no merge)** and the orchestrator drains a **serial land queue** by dispatching a bounded
+  **`sdd-merge-resolver`** per item — one at a time — which rebases onto the current tip, resolves a conflict
+  via `/resolving-merge-conflicts` **only if one arises**, runs the regression-gate, and merges to `done`.
+  The coordinator never runs the suite or merges itself; it only serializes and records. The loop
+  continues, **non-blocking**, to the next issue whose blockers are `done`.
 
 ### RECORD progress
-- Update `PROGRESS.md`: mark the slice `done` (auto-merge) or `in-review` with its **PR URL**
-  (human-review); note what changed, what's next, any open question. Under human-review a human merging
-  the PR is what flips the issue to `done` (reconciled on next prime). **Keep it lean** — one concise
+- Update `PROGRESS.md` and the **backlog status**: mark the slice `done` (serial auto-merge),
+  `ready-to-land` (parallel auto-merge — the serial land queue flips it to `done` once merged), or
+  `in-review` with its **PR URL** (human-review); note what changed, what's next, any open question. Under
+  human-review a human merging the PR flips the issue to `done`; under parallel the land queue merging
+  flips `ready-to-land → done` (both reconciled on next prime). **Keep it lean** — one concise
   worklog line per slice, per PROGRESS.md's fixed structure; old phases are compacted to a mini-summary
   by the phase-opener, so don't accumulate old-issue detail.
 - **Update the `SDD-CURSOR` block** (the four fixed fields the `SessionStart` hook reads): `Phase`, `Doing`
