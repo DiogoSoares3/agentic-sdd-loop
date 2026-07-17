@@ -66,7 +66,7 @@ context deterministically:
 
 Paths, not contents — the worker reads them itself:
 
-1. `.sdd/profile.md` — régua, seams, DoD, test command, merge policy, integrity level.
+1. `.sdd/profile.md` — régua, seams, DoD, test commands (slice + full-suite), merge policy, integrity level.
 2. `PROGRESS.md` — current state.
 3. `docs/phases/phase-N/prd.md` — the phase PRD (NOT the whole root PRD).
 4. `ARCHITECTURE.md` + the ADRs the issue touches — seam + test mechanism.
@@ -105,8 +105,36 @@ happened.
 
 **Prune on `done`:** once an issue lands, remove its leftovers — `git worktree remove` (if a worktree),
 `git branch -d` the local branch, and delete the remote branch if pushed (provider "delete on merge", else
-`git push origin --delete`). Also sweep already-merged leftovers from earlier issues. **Never prune a
-`blocked` / `needs-decision` branch** (local or remote) — that quarantine is a human's to inspect.
+`git push origin --delete`). Also sweep already-merged leftovers from earlier issues. **Never prune before
+the regression gate has passed and the merge is confirmed landed** — a branch whose CI / local full-suite is
+pending or failed is still needed to re-dispatch the fix. **Never prune a `blocked` / `needs-decision` /
+regression-failed branch** (local or remote) — that quarantine is a human's to inspect.
+
+## Two test gates — slice (worker) vs regression (merge)
+
+Testing accretes: every issue commits its behaviour/integration test + its units, and they stay in the repo
+for good. Two gates check them at two scopes:
+
+- **Slice-gate — the worker, at CLOSE.** Proves THIS issue: outer behaviour/integration test green, inner
+  units green (n/a when `skipped`), from a clean checkout, assertions unchanged-or-stronger vs the RED
+  snapshot. Scope = what the issue touches (the profile's **slice command**). Runs before the branch is
+  handed off.
+- **Regression-gate — at the merge to a non-feature branch.** Proves the slice didn't break earlier
+  behaviour, and catches semantic breaks from concurrent merges no single branch can see. Scope = the
+  **whole** accumulated suite (the profile's **full-suite/regression command**) against the integration
+  branch tip. The plugin does **not** force where it runs:
+  - **Recommended: CI.** The provider's checks run the full suite on the PR / on push and on merge to a
+    protected branch — this is what `auto-merge`'s "green **+ passing checks**" and `human-review`'s PR
+    already hook into. Minimum: an e2e/regression run at each merge to a non-feature branch.
+  - **Fallback (provider `none`, local merge): the loop runs the full-suite command locally** before
+    landing, so the default is never unprotected.
+
+**A regression-gate failure is a non-green re-dispatch, not a new escalation type.** If CI (or the local
+full-suite) fails after a worker returned green, the orchestrator re-dispatches a fresh worker on the SAME
+`issue/*` branch — it resumes from git/test state, exactly as a `doing` issue does — to make the full suite
+green by **fixing the code**. The worker **must not** edit a landed test to silence the failure (the same
+integrity line as the immutable scenario); a genuine behaviour change is `needs-revalidation`, never a quiet
+test edit.
 
 ## Dispatch (always via subagents)
 
@@ -148,9 +176,10 @@ OUTER  (BDD)  realize the scenario as the behaviour test at the arch seam → ru
 INNER  (TDD — only if `Inner loop (TDD)` is `required`)  unit → minimal code → unit green (repeat).
        COMMIT the implementation separately from the test.  [#3]
        When `skipped`: minimal implementation to make the OUTER test green — no inner loop; other guards hold.
-CLOSE  inner units green (n/a if skipped) AND outer green AND phase DoD items pass (profile test command)
-       AND a CLEAN re-run with assertions unchanged-or-stronger vs the RED snapshot.  [#4]  Refactor while green.
-POST   LAND per merge policy (auto-merge → done | human-review → in-review + PR URL).  [#5]
+CLOSE  (slice-gate) inner units green (n/a if skipped) AND outer green AND phase DoD items pass (profile
+       SLICE command) AND a CLEAN re-run, assertions unchanged-or-stronger vs the RED snapshot.  [#4]  Refactor while green.
+POST   LAND per merge policy — the REGRESSION-gate runs at this merge (CI, or the local full-suite command
+       when provider `none`); auto-merge → done on green | human-review → in-review + PR URL.  [#5]
        Update PROGRESS worklog + next issue. subagent: discard the worktree. Return the report.
 ```
 
@@ -167,13 +196,17 @@ Structural, not just prose (the full statements live in `agents/issue-worker.md`
 - **`[#2]` Prove RED for the right reason** before any implementation.
 - **`[#3]` Two commits, test-first.** Behaviour test committed before implementation.
 - **`[#4]` Re-run from clean at close.** A weakened-but-green test fails the dispatch.
-- **`[#5]` Independent checks.** Two are always-on and one is opt-in:
+- **`[#5]` Independent checks.** One is always-on; the rest are opt-in:
   - **`SubagentStop` verify guard (always on).** At the worker's exit it re-reads git: a reported `green`
     with no committed test on the `issue/*` branch (or an empty branch) is **blocked** and the worker is
     sent back. Honest escalations pass through. This is the mechanical backstop for a silently-compacted
     worker that returns a hollow green.
   - **`PreToolUse` test-first hook (opt-in, `integrity: +hook`).** Denies an implementation edit on an
     `issue/*` branch until a test is committed (BDD outer is always required); editing a test is allowed.
+  - **`PreToolUse` landed-test warning (opt-in, `integrity: +hook`, non-blocking).** When a worker edits a
+    test that already lives on the integration branch, it emits an advisory (fix the code, not a landed
+    test earlier issues depend on) — a *warning*, not a block, since a shared fixture may legitimately
+    evolve. This is the soft guard for the regression-gate's "never edit a landed test" rule.
   - **Verifier agent (opt-in, `integrity: +verifier`).** Re-reads the branch/PR diff for test-gaming
     before the merge.
 

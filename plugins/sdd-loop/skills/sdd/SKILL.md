@@ -161,11 +161,13 @@ subagents). Every issue is built on **its own branch off the integration branch
   (default), `/tdd` runs the inner loop (unit → code → unit green); when it is **`skipped`** the minimal
   implementation makes the outer test green with no inner loop. Done only when the outer behaviour test —
   **and** the inner units, if the inner loop ran — are green **and** the phase DoD items it touches pass
-  (run the profile's **test command**). Refactor while green.
+  (run the profile's **slice** command — the slice-gate). Refactor while green.
 - **Close:** land the issue per the profile's **merge policy** — `auto-merge` merges it to `done` in the
   same dispatch (green + passing checks); `human-review` opens a PR and stops at `in-review` until a
-  human merges. The dispatch reports back per the contract in `dispatcher.md`. The loop continues,
-  **non-blocking**, to the next issue whose blockers are `done`.
+  human merges. **The regression-gate (the full accumulated suite) runs at this merge** — the provider's CI
+  checks, or the profile's full-suite command locally when the provider is `none`; a failure re-opens the
+  issue to fix the **code** (never a landed test). The dispatch reports back per the contract in
+  `dispatcher.md`. The loop continues, **non-blocking**, to the next issue whose blockers are `done`.
 
 ### RECORD progress
 - Update `PROGRESS.md`: mark the slice `done` (auto-merge) or `in-review` with its **PR URL**
@@ -179,7 +181,8 @@ subagents). Every issue is built on **its own branch off the integration branch
   reason the loop paused). This block is the deterministic resume point — keeping it current at every RECORD
   is what lets a compacted or re-entered session (and the `ask` prompt) know exactly where it is.
 - **Prune landed issues:** on `done`, remove the worktree + delete the local **and** remote issue branch
-  (sweep earlier leftovers too). Never prune a `blocked` / `needs-decision` branch — it's quarantined.
+  (sweep earlier leftovers too). Never prune before the regression-gate has passed and the merge is landed,
+  and never prune a `blocked` / `needs-decision` / regression-failed branch — it's quarantined.
 - **Tactical** spec refinements (tighten a criterion) → record here and reflect into `PRD.md`.
   **Structural** changes (scope/architecture) → stop and flow up for re-validation.
 

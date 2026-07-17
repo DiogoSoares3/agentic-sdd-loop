@@ -57,8 +57,14 @@ The checklist a phase must satisfy to be done.
 How epics are sized and ordered (dependency order, must-first, one seam group per phase).
 
 ## Test command(s)
-The exact command(s) that prove a slice green.
-> e.g. `pytest -q` / `dbt build` + `dbt test --select source:*`
+Two scopes (they may be the same command in a small project):
+- **Slice command** — proves ONE issue green (its behaviour/integration test + its units). The worker runs
+  it at close, before handing off the branch. Scope it to what the issue touches; keep it fast.
+  > e.g. `pytest -q tests/<area>` / `dbt build --select state:modified+`
+- **Full-suite / regression command** — runs EVERY test in the project (all prior issues' behaviour +
+  units), proving new work didn't break earlier behaviour. This backs the regression gate below — keep it
+  whole, not scoped.
+  > e.g. `pytest -q` / `dbt build` + `dbt test`
 
 ## Loop
 - **Acceptance scenarios:** issues carry a Gherkin `Scenario:` (authored via `/bdd`), realized as the
@@ -93,8 +99,9 @@ The exact command(s) that prove a slice green.
   scenario+flag, RED proof, test-first commit, clean re-run) plus the shipped `PreToolUse` guard
   (`+hook`: on an `issue/*` branch, deny an implementation edit until a **behaviour/BDD test** is committed
   — universal, since the BDD outer test is required even for TDD-`skipped` issues; docs/spec/state edits are
-  always allowed). Optionally add `+verifier` (an independent agent re-reads the **branch/PR diff** for
-  test-gaming). Drop to bare `prose+git` only if the project's test paths don't match the default and you
+  always allowed). `+hook` also enables a **non-blocking** warning when a worker edits a test that already
+  lives on the integration branch (a *landed* test — fix the code, not the test). Optionally add `+verifier`
+  (an independent agent re-reads the **branch/PR diff** for test-gaming). Drop to bare `prose+git` only if the project's test paths don't match the default and you
   don't want to set `SDD_TEST_PATTERN`. Escalate uncovered critical decisions via `/grill-me` → ADR/PRD.
 
 ## Git strategy (branch-per-issue)
@@ -110,6 +117,16 @@ The exact command(s) that prove a slice green.
   - `human-review` — open a PR and stop at `in-review`; the loop is **non-blocking** (moves to the next
     issue whose blockers are landed); a human merges, flipping it to `done`. Autonomous within a phase,
     human merge-gate at each phase boundary.
+- **Regression gate (at merge to a non-feature branch):** the **full-suite/regression command** must pass
+  before an issue lands on the integration branch (and before `develop → main`). Placement is flexible —
+  the plugin does **not** impose a CI config:
+  - **Recommended: CI.** Wire your provider's checks to run the full suite on the PR / on push of an
+    `issue/*` branch and on merge to any protected branch (`develop`, `main`, …). Shape it however you
+    like — the **minimum** is an e2e/regression run at each merge to a non-feature branch.
+  - **Fallback (provider `none`, local merge): the loop runs the full-suite command locally** before
+    landing, so the default config is never unprotected.
+  A failure here never weakens a test — it re-opens the issue to fix the **code** (a genuine behaviour
+  change escalates as `needs-revalidation`).
 - **Backlog statuses:** `todo → doing → done` (auto-merge) · `todo → doing → in-review → done` (human-review).
 
 ## Paths

@@ -4,7 +4,7 @@
 set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 H="$REPO/plugins/sdd-loop/hooks"
-ENF="$H/sdd-enforce-test-first.sh"; SS="$H/sdd-session-start.sh"
+ENF="$H/sdd-enforce-test-first.sh"; SS="$H/sdd-session-start.sh"; WARN="$H/sdd-warn-landed-test-edit.sh"
 SCRATCH="$(cd "$(dirname "$0")" && pwd)"
 BASE="$(mktemp -d)"; PASS=0; FAIL=0
 G='\033[0;32m'; R='\033[0;31m'; N='\033[0m'
@@ -41,6 +41,29 @@ chk "NOT on issue branch -> allow"                   '[ "$(enf "'"$d"'" "'"$d"'/
 # repo-relative classification: ancestor dir named 'test' must NOT disable the guard
 anc="$BASE/testing-zone/proj"; mkdir -p "$anc"; mkrepo "$anc"; git -C "$anc" checkout -q -b issue/2-y
 chk "ancestor dir named 'test' still BLOCKS impl"    '[ "$(enf "'"$anc"'" "'"$anc"'/src/y.py")" = 2 ]'
+
+echo
+echo "===== GROUP 1b — PreToolUse: WARN on editing a LANDED test (non-blocking) ====="
+warn(){ # $1 project-dir  $2 file_path  -> echoes the systemMessage (empty if none)
+  local json; json="$(jq -nc --arg f "$2" '{tool_input:{file_path:$f}}')"
+  CLAUDE_PROJECT_DIR="$1" bash "$WARN" 2>/dev/null <<<"$json" | jq -r '.systemMessage // empty' 2>/dev/null
+}
+d="$BASE/w1"; mkrepo "$d"                                  # +hook, develop base
+mkdir -p "$d/tests"; echo 'def test_a(): assert 1' > "$d/tests/test_landed.py"
+git -C "$d" add -A; git -C "$d" commit -qm 'landed test'   # test now lives on develop
+git -C "$d" checkout -q -b issue/9-z
+chk "LANDED test edited on issue branch -> WARN"      '[ -n "$(warn "'"$d"'" "'"$d"'/tests/test_landed.py")" ]'
+echo 'def test_n(): assert 1' > "$d/tests/test_new.py"     # new test, not on develop
+chk "NEW (unlanded) test -> silent"                  '[ -z "$(warn "'"$d"'" "'"$d"'/tests/test_new.py")" ]'
+chk "impl file (not a test) -> silent"               '[ -z "$(warn "'"$d"'" "'"$d"'/src/x.py")" ]'
+git -C "$d" checkout -q develop
+chk "landed test edited NOT on issue branch -> silent" '[ -z "$(warn "'"$d"'" "'"$d"'/tests/test_landed.py")" ]'
+d="$BASE/w2"; mkdir -p "$d/.sdd"; git -C "$d" init -q -b develop
+git -C "$d" config user.email t@t; git -C "$d" config user.name t
+printf 'integrity: prose+git\n' > "$d/.sdd/profile.md"     # +hook OFF
+mkdir -p "$d/tests"; echo x > "$d/tests/test_l.py"; git -C "$d" add -A; git -C "$d" commit -qm seed
+git -C "$d" checkout -q -b issue/1-a
+chk "+hook OFF -> silent even for a landed test"     '[ -z "$(warn "'"$d"'" "'"$d"'/tests/test_l.py")" ]'
 
 echo
 echo "===== GROUP 2 — SessionStart: re-prime injection ====="

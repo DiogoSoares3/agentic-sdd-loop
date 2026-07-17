@@ -14,7 +14,7 @@ sub-agent, **never** touch a second issue.
 > The `docs/…` locations below are **defaults**. The real ones come from `.sdd/profile.md` → **Paths**
 > (Baselines / Durable state / Phases dir); a project may relocate them out of `docs/`. Read the profile
 > first and use whatever it states — for both the files you read and `docs/PROGRESS.md` you update.
-- `.sdd/profile.md` — régua, seams, **test command**, merge policy, integrity level.
+- `.sdd/profile.md` — régua, seams, **test commands** (slice + full-suite/regression), merge policy, integrity level.
 - `docs/PROGRESS.md` — current state.
 - `docs/phases/phase-N/prd.md` — the phase PRD this issue derives from (**not** the root PRD).
 - `docs/ARCHITECTURE.md` + the ADRs this issue touches — the seam + test mechanism.
@@ -52,17 +52,20 @@ INNER (TDD)  Run this step ONLY if `Inner loop (TDD)` is `required` (the default
              line is your only durable "where I was". Skip it when the flag is `skipped` (no inner loop).
              When `skipped`: write the minimal implementation that makes the OUTER test green — no
              inner unit loop; every other guard is unchanged.
-CLOSE        - inner units green (n/a when `skipped`)  AND
+CLOSE        (slice-gate — proves THIS issue)
+             - inner units green (n/a when `skipped`)  AND
              - outer behaviour test green  AND
-             - the phase DoD items this issue touches pass (run the profile's test command)
+             - the phase DoD items this issue touches pass (run the profile's SLICE command)
              - re-run from a CLEAN checkout; assertions unchanged-or-stronger vs the RED snapshot —
                a weakened-but-green test FAILS the dispatch                                          [#4]
              - refactor while green
-LAND         per the profile's merge policy:                                                        [#5]
-             - auto-merge:   land on green + passing checks (provider: open+merge PR; none: merge the
-                             issue branch into develop locally). Mark the issue `done`.
-             - human-review: push + open a PR into develop (scenario + green proof in the body); mark
-                             `in-review`, record the PR URL. Do NOT merge — a human does.
+LAND         per the profile's merge policy — the REGRESSION-gate runs at this merge (the profile's
+             full-suite/regression command over the WHOLE suite):                                   [#5]
+             - auto-merge:   provider → open+merge PR, the provider's checks are the regression-gate;
+                             none → run the full-suite command locally, then merge into develop. Mark
+                             the issue `done` only once that gate is green.
+             - human-review: push + open a PR into develop (scenario + green proof in the body); CI on the
+                             PR is the regression-gate. Mark `in-review`, record the PR URL. A human merges.
 ```
 
 ## Integrity — the test is the spec, not a target to move (immutable to you)
@@ -73,6 +76,10 @@ LAND         per the profile's merge policy:                                    
 - **Two commits, test-first.** The behaviour test is committed before the implementation.
 - **Re-run from clean at close.** A weakened-but-green test fails the dispatch.
 - Make the **code** satisfy the test, **never** the reverse.
+- **Regression is the full suite at the merge, not your slice.** The slice-gate proves your own tests; the
+  **regression-gate** (CI, or the local full-suite command when the provider is `none`) proves you didn't
+  break earlier issues. If it fails, fix the **code** — **never** edit, weaken, or delete a **landed** test
+  to go green (same line as the immutable scenario). A genuine behaviour change is `needs-revalidation`.
 - **Your stop is verified.** A `SubagentStop` guard re-reads git at exit: if you report success but no
   test is committed on the `issue/*` branch (or the branch is empty), it **blocks the stop** and sends
   you back to fix it. A truthful `blocked`/`needs-decision`/`needs-revalidation` return is always let

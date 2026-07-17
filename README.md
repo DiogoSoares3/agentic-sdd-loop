@@ -87,7 +87,7 @@ MAIN SESSION = phase orchestrator   (you, running /sdd; re-driven by /loop)
 | `sdd-phase-opener` | cut ONE phase: derive the epic, write its phase PRD + backlog (scenarios + TDD flags) | `phase N opened · M issues` |
 | `sdd-issue-worker` | build ONE issue to green via the BDD/TDD double loop, land per merge policy | `green` / `blocked` / `needs-decision` / `needs-revalidation` |
 
-**Three hooks** (`hooks/`), self-gating (silent no-op outside an SDD project; the `+hook` guard bites only
+**Four hooks** (`hooks/`), self-gating (silent no-op outside an SDD project; the `+hook` guard bites only
 when the profile enables it; the `SubagentStop` guard fails open on anything but our two agents) — this is
 how context injection and enforcement become **deterministic** instead of relying on the agent's
 self-discipline:
@@ -96,6 +96,7 @@ self-discipline:
 |---|---|---|
 | `SessionStart` (resume\|compact) | main session resumes/compacts | **re-injects** `PROGRESS.md` + the re-prime checklist (via `additionalContext`) so the loop re-enters instead of freelancing — the one load-bearing compaction-survival mechanism |
 | `PreToolUse` (Edit\|Write) | any implementation edit, incl. inside subagents | **test-first enforcement** (`integrity: +hook`) — denies impl edits on an `issue/*` branch before a test is committed |
+| `PreToolUse` (Edit\|Write) | editing a test that already lives on the integration branch | **regression warning** (`integrity: +hook`, non-blocking) — flags editing a *landed* test on an `issue/*` branch (fix the code, not the test), with a false-positive caveat for shared fixtures |
 | `SubagentStop` | a bounded subagent (phase-opener / issue-worker) finishes | **verifies the exit** — blocks a "green" with no committed test, or an "opened" with no backlog; lets honest `blocked`/`needs-decision` returns through |
 
 There is deliberately **no `PreCompact` hook**: `PreCompact` cannot inject context into the model (it can
@@ -244,6 +245,6 @@ in `PROGRESS.md` and drives iterations via `/loop` (or the `auto` supervisor / a
 
 ### Testing Suite
 
-*   **Deterministic Hook Suite (`bash tests/faixa-a.sh`):** Runs the deterministic hook suite with 35 checks, completely independent of any model or network dependencies. It exercises all three core hooks—`SessionStart` re-prime, `PreToolUse` test-first, and `SubagentStop` verify—alongside path-awareness tested against real, throwaway git repositories and profiles.
+*   **Deterministic Hook Suite (`bash tests/faixa-a.sh`):** Runs the deterministic hook suite with 50 checks, completely independent of any model or network dependencies. It exercises all four core hooks—`SessionStart` re-prime, `PreToolUse` test-first, `PreToolUse` landed-test regression warning, and `SubagentStop` verify—alongside path-awareness tested against real, throwaway git repositories and profiles.
 *   **Sub-suites:** You can also run `tests/subagentstop.sh` and `tests/test-paths.sh` standalone, as these are the specific sub-suites called by the main script.
 *   **Live End-to-End Run (Faixa B):** To run the live end-to-end execution—driven through a real headless model following the `PLAN` → `/compact` → `CONTINUE` flow to verify compaction survival—refer to the `tests/live/` directory. This process requires a token and network access, and is strictly isolated inside **Docker** with the repository mounted as read-only (or via `sandbox-exec` on macOS).
