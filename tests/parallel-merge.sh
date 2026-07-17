@@ -15,6 +15,7 @@
 #
 # Requires: git, python3 + pytest, jq (for the hook check). Runs entirely in a mktemp dir.
 set -uo pipefail
+export PYTHONDONTWRITEBYTECODE=1   # re-running pytest across git rebases: never let a stale .pyc mask a break
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WARN="$REPO/plugins/sdd-loop/hooks/sdd-warn-landed-test-edit.sh"
 BASE="$(mktemp -d)"; PASS=0; FAIL=0
