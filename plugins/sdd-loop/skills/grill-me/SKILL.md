@@ -3,11 +3,13 @@ name: grill-me
 description: Interview the user relentlessly about a plan or design until reaching shared understanding, resolving each branch of the decision tree. Use to stress-test a plan, to AUTHOR a missing PRD (with the stakeholder) or ARCHITECTURE.md (with the engineer) from scratch, or to validate a single escalated technical decision with the engineer before recording it as an ADR/PRD amendment. Triggers on "grill me", "stress-test", "no PRD/ARCHITECTURE yet", or an SDD `needs-decision` escalation.
 ---
 
-Interview me relentlessly about every aspect of this plan until we reach a shared understanding. Walk down each branch of the design tree, resolving dependencies between decisions one-by-one. For each question, provide your recommended answer.
+Interview me relentlessly about every aspect of this until we reach a shared understanding. Walk down each branch of the decision tree, resolving dependencies between decisions one-by-one. For each question, provide your recommended answer.
 
 Ask the questions one at a time, waiting for feedback on each question before continuing. Asking multiple questions at once is bewildering.
 
-If a question can be answered by exploring the codebase, explore the codebase instead.
+If a fact can be found by exploring the environment (filesystem, tools, etc.), look it up rather than asking me. The decisions, though, are mine — put each one to me and wait for my answer.
+
+You're done when every branch of the decision tree has been visited and nothing is left silently assumed. Do not act on it until I confirm we have reached a shared understanding.
 
 ## Uses inside the SDD loop
 
