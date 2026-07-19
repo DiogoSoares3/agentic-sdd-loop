@@ -16,7 +16,8 @@ plugin-agnostic for the same reason.)
 The **invariant spine** is below (Layer 1). The
 **per-project values** (what a slice is, the seams, the *régua*, the test command) live in `.sdd/profile.md`
 (Layer 2) — read it, never hardcode its contents here. The **tools** you call (`/to-prd`, `/to-issues`,
-`/to-adr`, `/bdd`, `/tdd`, `/handoff`, `/grill-me`, `/loop`, `/resolving-merge-conflicts`) are Layer 3. You
+`/to-adr`, `/to-rfc`, `/bdd`, `/tdd`, `/grill-me`, `/loop`, `/resolving-merge-conflicts`) are
+Layer 3. You
 dispatch bounded work to three subagents — **[`sdd-phase-opener`](../../agents/phase-opener.md)** (cut one
 phase), **[`sdd-issue-worker`](../../agents/issue-worker.md)** (build one issue), and
 **[`sdd-merge-resolver`](../../agents/merge-resolver.md)** (land one queued branch, resolving a conflict if any; parallel mode
@@ -210,9 +211,15 @@ definition):
 - Run **`/grill-me`** to put the human who owns that truth in the loop — the **engineer** for a
   technical / architecture / behaviour call, the **stakeholder** for scope — on that single decision,
   one branch at a time (propose a recommendation per question).
+- **For a weighty fork that needs asynchronous team sign-off** (real competing alternatives, hard to
+  reverse, more than one owner), **suggest — never force** — raising a **Request for Comments** (**`/to-rfc`**)
+  instead of resolving it in this one grill: it records the options + the team's decision as
+  `docs/rfcs/RFC-N` (status `to-be-validated`). The issue **stays parked** — its `needs-decision` is still
+  open — until the team validates the RFC; a quick, clearly-owned call skips the RFC and just grills.
 - **Flow the resolution up:** technical → a new **ADR** (write it via **`/to-adr`**) + update
-  `ARCHITECTURE.md` (engineer-validated); scope/product → a **PRD amendment** (stakeholder-validated). The
-  baseline now covers it.
+  `ARCHITECTURE.md` (engineer-validated); scope/product → a **PRD amendment** (stakeholder-validated). A
+  validated RFC materializes the same way (`/to-adr` with Origin `RFC-N accepted`, then flip the RFC to
+  `validated (ADR-M)`). The baseline now covers it.
 - Resume the issue; future agents inherit the decision — the spec grew, controlled.
 
 **Tactical, reversible** decisions do NOT escalate: make them and record them in `PROGRESS.md`.
@@ -223,10 +230,9 @@ context gate is now **event-driven**, and recovery lives in **one** load-bearing
 
 - **Mid-work overflow (main session)** — the harness compacts; the **`SessionStart` hook (resume|compact)**
   re-injects `PROGRESS.md` + the re-prime checklist (via `additionalContext`), and the loop continues.
-  **No hand-authored `/handoff` is required for correctness** — RECORD-after-every-issue keeps `PROGRESS.md`
+  **No hand-authored handoff is required for correctness** — RECORD-after-every-issue keeps `PROGRESS.md`
   current and the re-prime reconstructs position. (There is deliberately no `PreCompact` handoff hook: it
-  cannot inject context into the model, so any reminder there is invisible — it was removed. `/handoff`
-  remains a human-initiated optional checkpoint, never part of the automated loop.)
+  cannot inject context into the model, so any reminder there is invisible — it was removed).
 - **Silent subagent overflow** — a subagent gets no lifecycle hook, so it compacts silently. Guarded by
   keeping each subagent bounded (one window), the **`SubagentStop`** verify guard (blocks a hollow-green
   exit), and the required-TDD `PROGRESS.md` checkpoint (mid-issue resume). See `dispatcher.md`.

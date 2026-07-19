@@ -46,7 +46,9 @@ _The very next slice to pick up (mirrors cursor `Next`) + any prep it needs. Not
 
 ## Open questions
 _Decisions pending / to flow up for re-validation. For a `needs-decision` / `needs-revalidation` stop, state the
-exact question here so the re-entry resolves it. **Delete each once resolved** — never keep answered ones._
+exact question here so the re-entry resolves it. If the decision was formalized as a Request for Comments, note
+its file + status (`RFC-000N to-be-validated — blocks issue <id>`) so re-entry knows the decision is still open
+until the team validates it. **Delete each once resolved** (the RFC is `validated (ADR-XXXX)`) — never keep answered ones._
 
 ## Worklog — current phase only (most recent first)
 _One concise line per slice of the CURRENT phase: what shipped + gate result + PR URL (+ note `in-review`→`done`

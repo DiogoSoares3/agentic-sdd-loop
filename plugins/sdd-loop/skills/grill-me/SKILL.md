@@ -62,9 +62,20 @@ repo may have nothing — then grill from the PRD + régua.)
    will inherit — may be worth capturing as an ADR right then** (write it via **`/to-adr`**, which numbers it
    and names the discarded alternative), *while* building the architecture rather than only after. **Nothing forces an
    ADR per decision** — it's a judgment call on what a future agent will need to know. It needs **engineer
-   validation**.
+   validation**. And when such a fork has **real competing alternatives and would benefit from asynchronous,
+   multi-person team sign-off** (not just this session's owner), **suggest** — never force — formalizing it as a
+   **Request for Comments** first (**`/to-rfc`** → `docs/rfcs/`, status `to-be-validated`): the team comments and
+   validates out-of-band, and once accepted it materializes into the ADR / `ARCHITECTURE.md` amendment
+   (`validated (ADR-NNNN)`). The light path (grill here → `/to-adr`) stays the default; the RFC is the opt-in
+   heavy path for a genuinely team-level decision.
 3. **Validate one escalated `needs-decision` (with the engineer).** The loop stopped on a structural /
    critical / hard-to-reverse call no baseline covers. Grill **one decision only**, with the **engineer**
    for a technical/architecture/behaviour call (or the **stakeholder** for scope). Record the resolution
    as a new **ADR** (via **`/to-adr`**) + `ARCHITECTURE.md` update (engineer-owned) or a **PRD amendment** (stakeholder-owned)
    — never let the build agent invent it silently. Then the loop resumes and future agents inherit it.
+   **If the escalated call is weighty enough to need async team sign-off** rather than this one grill,
+   **suggest** raising a **Request for Comments** (**`/to-rfc`**) instead: it records the options + the team's
+   decision as `docs/rfcs/RFC-N` (`to-be-validated`); the escalated issue stays parked (its `needs-decision`
+   is still open) until the RFC is `validated (ADR-NNNN)`, at which point the same `/to-adr` + amendment step
+   materializes it and the loop re-dispatches. Suggested, never forced — a quick, clearly-owned call just
+   grills here and writes the ADR.

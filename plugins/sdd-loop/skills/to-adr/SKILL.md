@@ -14,6 +14,12 @@ grill, at a phase/issue decision, or after a `needs-decision` escalation. It is 
 decision only when a future agent would need to know it. A build **worker never calls this** — it escalates
 `needs-decision`, and the orchestrator (with the human) resolves and records.
 
+**A decision may reach this skill via a validated RFC.** For a weighty fork the team validated
+asynchronously, the accepted `docs/rfcs/RFC-NNNN` is the closed decision — record it as
+an ADR here (set the **Origin** line to `RFC-NNNN accepted`), then **flip that RFC's Status to
+`validated (ADR-<this NNNN>)`** and fill its Outcome, so the RFC points at the ADR it produced. The RFC is
+the proposal; this ADR is the durable record.
+
 ## Process
 
 1. **Resolve paths from `.sdd/profile.md` → `## Paths` — never hardcode `docs/`.** From the **Baselines**

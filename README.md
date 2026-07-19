@@ -17,7 +17,7 @@ library, CLI, and so on.
 |---|---|---|
 | **1. Core methodology** | the invariant SDD+TDD loop — state machine, gates, escalation, dispatcher, the three bounded subagents, the lifecycle/enforcement hooks | `skills/sdd/*` · `agents/*` · `hooks/*` |
 | **2. Project profile** | régua, slice, seams, DoD, test command, loop/git knobs | `.sdd/profile.md` *(per repo, via `/sdd-init`)* |
-| **3. Tools** | `/to-prd`, `/to-issues`, `/to-adr`, `/bdd`, `/tdd`, `/handoff`, `/grill-me`, `/resolving-merge-conflicts` (+ builtin `/loop`, `/schedule`) | `skills/*` |
+| **3. Tools** | `/to-prd`, `/to-issues`, `/to-adr`, `/to-rfc`, `/bdd`, `/tdd`, `/grill-me`, `/resolving-merge-conflicts` (+ builtin `/loop`, `/schedule`) | `skills/*` |
 
 ## How the loop works
 
@@ -44,7 +44,11 @@ Each issue is built on its **own branch off the integration branch** (`develop`)
 to `main`. **Escalation:** a subagent has no back-channel, so when a decision the baselines don't answer
 arises (structural/critical) the worker **returns `needs-decision`**; the orchestrator runs **`/grill-me`**
 with the engineer (→ ADR) or stakeholder (→ PRD amendment) and **re-dispatches** — the spec grows,
-controlled. It never resolves a structural decision on its own.
+controlled. It never resolves a structural decision on its own. For a **weighty fork that needs asynchronous
+team sign-off**, the assistant may **suggest** (never force) a **Request for Comments** (**`/to-rfc`** →
+`docs/rfcs/`, status `to-be-validated`) — the team validates it out-of-band, and on acceptance it materializes
+into an ADR/PRD amendment (`validated (ADR-NNNN)`) and the parked issue resumes; the RFC file's own status is
+the truth, so no new loop state is added.
 
 The loop is **finite** (one iteration = one issue; a phase is bounded by its backlog size) and its
 iteration **contract is host-agnostic** — any mechanism that re-enters the dispatcher works: builtin
@@ -123,7 +127,8 @@ putting the coordinator in the wrong place.
 |---|---|---|
 | `docs/PRD.md` | root product truth — personas & user stories, MoSCoW scope, `FR-n`/`NFR-n`, DoD | `/to-prd` → **stakeholders** |
 | `docs/ARCHITECTURE.md` | technical truth — seams, components, Mermaid diagram, ADR index | `/grill-me` + template → **engineers** |
-| `docs/adrs/*.md` | closed decisions (from `templates/arch/adr.template.md`) | **`/to-adr`** — recorded wherever a decision closes (grill / build / escalation) |
+| `docs/adrs/*.md` | closed decisions (from `templates/arch/adr.template.md`) | **`/to-adr`** — recorded wherever a decision closes (grill / build / escalation / a validated RFC) |
+| `docs/rfcs/*.md` | Request-for-Comments proposals a team validates before a decision closes (from `templates/rfc/rfc.template.md`); status `to-be-validated` → `validated (ADR-NNNN)` | **`/to-rfc`** — *suggested*, not forced, for a weighty fork needing async team sign-off |
 | `docs/phases/phase-N/prd.md` | thin phase projection (derived, no sign-off) | PLAN step |
 | `docs/phases/phase-N/backlog.md` | that phase's vertical issues + Gherkin scenarios | `/to-issues` + `/bdd` |
 | `docs/PROGRESS.md` | durable loop state + the `SDD-CURSOR` resume block (single global cursor) | the loop |
@@ -134,6 +139,7 @@ docs/
   PRD.md                    # product baseline (MoSCoW)            — stakeholders
   ARCHITECTURE.md           # technical baseline (+ Mermaid diagram) — engineers
   adrs/NNNN-*.md            # closed decisions (global)
+  rfcs/NNNN-*.md            # team-validated proposals (to-be-validated → validated (ADR-NNNN))
   phases/
     phase-1/prd.md          # thin projection of epic 1
     phase-1/backlog.md      # epic 1's issues

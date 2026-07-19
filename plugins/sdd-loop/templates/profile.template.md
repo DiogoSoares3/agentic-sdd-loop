@@ -112,7 +112,10 @@ Two scopes (they may be the same command in a small project):
   always allowed). `+hook` also enables a **non-blocking** warning when a worker edits a test that already
   lives on the integration branch (a *landed* test — fix the code, not the test). Optionally add `+verifier`
   (an independent agent re-reads the **branch/PR diff** for test-gaming). Drop to bare `prose+git` only if the project's test paths don't match the default and you
-  don't want to set `SDD_TEST_PATTERN`. Escalate uncovered critical decisions via `/grill-me` → ADR/PRD.
+  don't want to set `SDD_TEST_PATTERN`. Escalate uncovered critical decisions via `/grill-me` → ADR/PRD;
+for a **weighty fork that needs asynchronous team sign-off**, the assistant may instead **suggest** a
+**Request for Comments** (`/to-rfc` → `docs/rfcs/`, status `to-be-validated`) that, once the team validates
+it, materializes into an ADR/PRD amendment (`validated (ADR-NNNN)`) — suggested, never forced.
 
 ## Git strategy (branch-per-issue)
 - **Protected branch:** `main` — the loop **never** commits here (human-only `develop → main` promotion).
@@ -149,7 +152,7 @@ Two scopes (they may be the same command in a small project):
 - **Phases dir:** `docs/phases/` — each epic gets `docs/phases/phase-N/` holding **`prd.md`** (the phase
   projection) and **`backlog.md`** (that phase's issues). Deterministic dir name `phase-N` (N = phase
   number); the epic's human name lives in the `prd.md` H1.
-- **Baselines:** root PRD `docs/PRD.md` · technical truth `docs/ARCHITECTURE.md` · ADRs `docs/adrs/`.
+- **Baselines:** root PRD `docs/PRD.md` · technical truth `docs/ARCHITECTURE.md` · ADRs `docs/adrs/` · RFCs `docs/rfcs/`.
 - **Durable state:** `docs/PROGRESS.md` — the single **global** loop cursor (the `SDD-CURSOR` block:
   phase / doing / next / stop-reason). One file, never per-phase.
 - **Templates:** root PRD for `/to-prd` = (path, or "skill default"); phase PRD (filled by PLAN) =

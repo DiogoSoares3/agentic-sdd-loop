@@ -12,7 +12,7 @@
     {
       "name": "sdd-loop",
       "source": "./plugins/sdd-loop",
-      "description": "SDD outer loop + BDD/TDD double inner loop, driven from a stakeholder-validated PRD.md and an engineer-validated ARCHITECTURE.md. A main-session orchestrator dispatches bounded subagents (sdd-phase-opener, sdd-issue-worker) and ships deterministic hooks (SessionStart re-prime, PreToolUse test-first, SubagentStop verify). Bootstrap with /sdd-init; orchestrates /to-prd, /to-issues, /to-adr, /bdd, /tdd, /grill-me, /handoff and /loop. Project-agnostic: each repo supplies a .sdd/profile.md."
+      "description": "SDD outer loop + BDD/TDD double inner loop, driven from a stakeholder-validated PRD.md and an engineer-validated ARCHITECTURE.md. A main-session orchestrator dispatches bounded subagents (sdd-phase-opener, sdd-issue-worker) and ships deterministic hooks (SessionStart re-prime, PreToolUse test-first, SubagentStop verify). Bootstrap with /sdd-init; orchestrates /to-prd, /to-issues, /to-adr, /to-rfc, /bdd, /tdd, /grill-me and /loop. Project-agnostic: each repo supplies a .sdd/profile.md."
     }
   ]
 }

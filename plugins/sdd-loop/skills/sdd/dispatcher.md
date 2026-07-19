@@ -111,7 +111,11 @@ human-review:           todo → doing → in-review (PR open, green) → done (
 **Reconcile on prime (all policies):** at the start of every orchestration tick, mark any
 `in-review`/`ready-to-land`/`doing` issue whose work is already in the integration branch as `done` (check
 `gh pr view`, or `git branch --merged` / log for the `issue/<id>` commits). Files stay the truth; this
-records a landing that already happened.
+records a landing that already happened. **Also reconcile any open RFCs:** if `docs/rfcs/` holds RFCs, read
+each one's Status — a `to-be-validated` RFC is an **open** decision (keep whatever it blocks parked; do not
+build past it), while a `validated (ADR-XXXX)` RFC is **resolved** (confirm its ADR/amendment actually
+landed, then it needs no further action). The RFC's own status line is the signal — there is no separate
+loop state for it.
 
 **Prune on `done`:** once an issue lands, remove its leftovers — `git worktree remove` (if a worktree),
 `git branch -d` the local branch, and delete the remote branch if pushed (provider "delete on merge", else
@@ -265,7 +269,13 @@ orchestrator resolves**:
   **stakeholder** (scope), records the resolution as a new **ADR** (via **`/to-adr`**) + `ARCHITECTURE.md` update
   or a **PRD amendment**, then **re-dispatches the worker** with the decision now in the baselines (and in
   the pack). The orchestrator **never resolves a structural decision from its own context** — that is
-  silent drift; structural always goes to the human.
+  silent drift; structural always goes to the human. **For a weighty fork that needs asynchronous team
+  sign-off**, the orchestrator may instead **suggest** (never force) formalizing it as a **Request for
+  Comments** (**`/to-rfc`** → `docs/rfcs/RFC-N`, `to-be-validated`): the issue **stays parked on its
+  `needs-decision`** (no new stop-reason — the RFC file's own status is the truth) until the team validates
+  it, at which point the RFC materializes via `/to-adr` (+ amendment) and is flipped to `validated (ADR-M)`,
+  and the worker is re-dispatched. This closes over the same baseline the light grill would have — just with
+  the team's decision on record.
 - **`blocked`** (missing fixture / unclear boundary / dependency not landed): the branch stays quarantined
   (`doing`, never lands); surface it. Do not fake green.
 - **`needs-revalidation`** (a gap in an *existing* baseline): flow up — `PRD.md` → stakeholders,
@@ -305,10 +315,9 @@ Because a dispatch is atomic (one issue, marked `doing`→`ready-to-land`/`done`
 
 - **Mid-work overflow (main session)** — the harness compacts; the `SessionStart` hook re-injects
   `PROGRESS.md` + the re-prime checklist, and the loop continues. No hand-authored handoff is required for
-  correctness — RECORD-after-every-issue keeping `PROGRESS.md` current + this re-inject reconstruct position
-  (the `/handoff` skill remains an optional, human-initiated richer checkpoint). In `subagent` dispatch the
-  main context grows mostly *between* issues (it relays reports; the build lives in the worker), so its
-  compaction tends to land at issue boundaries where `PROGRESS.md` is already current.
+  correctness — RECORD-after-every-issue keeping `PROGRESS.md` current + this re-inject reconstruct position.
+  In `subagent` dispatch the main context grows mostly *between* issues (it relays reports; 
+  the build lives in the worker), so its compaction tends to land at issue boundaries where `PROGRESS.md` is already current.
 - **Clean boundary** (phase drained / project complete) — nothing mid-flight; `PROGRESS.md` + backlog + git
   describe it fully. A fresh tick re-primes and PLANs the next phase, or stops if the project is done. (Under
   `human-review`, a phase boundary with open PRs is `awaiting-review`: pause and surface.)

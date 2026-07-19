@@ -97,6 +97,9 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
      backstop is always on.
    - **Phases dir + PROGRESS path** — default `docs/phases/` (each epic → `docs/phases/phase-N/prd.md` +
      `backlog.md`) and a single global `docs/PROGRESS.md`.
+   - **ADRs + RFCs dirs** — default `docs/adrs/` (closed decisions, written by `/to-adr`) and `docs/rfcs/`
+     (Request-for-Comments proposals a team validates before a decision closes, written by `/to-rfc`). Both
+     are created on demand at the first write; set the paths here if the project keeps them outside `docs/`.
    For each, propose a recommended default for the detected project type; let the user correct it.
    Leave **no** placeholder behind: every `<…>` token and every `> e.g.` example line in `.sdd/profile.md`
    must end up replaced with a real, project-specific value — `/sdd` refuses to run while any slot still
