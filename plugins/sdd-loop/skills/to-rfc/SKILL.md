@@ -41,10 +41,6 @@ The three moments to offer it — always as a suggestion the human accepts or de
 3. **A build-time `needs-decision`** surfaces — the orchestrator may suggest formalizing it as an RFC instead
    of (or before) a synchronous grill, so the team's decision is on record.
 
-**This is an orchestrator / human-in-the-loop skill — a build `sdd-issue-worker` never calls it.** A worker
-has no back-channel: it only **returns `needs-decision`** and terminates; the main-session orchestrator (with
-the human) is what raises an RFC, exactly as it is what runs `/grill-me` and `/to-adr`. Same level as those.
-
 If a decision is not all three, do **not** raise an RFC — write the ADR directly. Don't turn process into a product.
 
 ## Process (a thin writer — same shape every time, like `/to-adr`)
