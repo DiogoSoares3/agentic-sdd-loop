@@ -114,15 +114,30 @@ if [ -n "$ISSUE_ID" ]; then
   # The branch carries `<id>-<slug>` and ids routinely contain dashes (FR-1, P1-3, E2-7), so the id cannot
   # be cut at the first dash. Try progressively shorter dash-delimited prefixes — FR-1-add, FR-1, FR — and
   # keep the first that actually names a backlog entry. A bare cursor id (no slug) matches on the first try.
+  #
+  # The entry ends at the next heading of the SAME OR SHALLOWER level, never at any `#`-line: sdd-phase-opener
+  # writes each issue as `## Issue <id> …` with `### What to build` / `### Acceptance criteria` /
+  # `### Inner loop (TDD)` beneath it, so terminating on a bare `^#+ ` truncated every real entry at its first
+  # subheading — two lines in, long before the flag — and the check silently never fired.
   ENTRY=""; CAND="$ISSUE_ID"
   while [ -n "$CAND" ]; do
     ENTRY="$(printf '%s\n' "$BACKLOGS" \
-              | awk -v id="$CAND" 'tolower($0) ~ ("^#+ .*(^|[^a-z0-9])" tolower(id) "([^a-z0-9]|$)") {f=1;print;next} /^#+ /{f=0} f' \
+              | awk -v id="$(printf '%s' "$CAND" | tr '[:upper:]' '[:lower:]')" '
+                  { lvl = 0; if ($0 ~ /^#+ /) { match($0, /^#+/); lvl = RLENGTH } }
+                  !f && lvl > 0 && tolower($0) ~ ("^#+ .*(^|[^a-z0-9])" id "([^a-z0-9]|$)") { d = lvl; f = 1; print; next }
+                  f && lvl > 0 && lvl <= d { f = 0 }
+                  f { print }' \
               || true)"
     [ -n "$ENTRY" ] && { ISSUE_ID="$CAND"; break; }
     case "$CAND" in *-*) CAND="${CAND%-*}" ;; *) CAND="" ;; esac
   done
-  FLAG="$(printf '%s' "$ENTRY" | grep -iE 'inner loop' | head -n1 || true)"
+
+  # The flag is written EITHER inline (`Inner loop (TDD): required`) OR as a subheading whose value is on the
+  # following line(s) — the form sdd-phase-opener actually produces. So take the matching line plus what
+  # follows it, up to the next heading, instead of that one line.
+  FLAG="$(printf '%s\n' "$ENTRY" | awk '
+            f { if ($0 ~ /^#+ /) exit; print; if (++n >= 3) exit; next }
+            tolower($0) ~ /inner loop/ { f = 1; print }' || true)"
   # Only `required` is checked. `skipped`, an absent flag, or no entry at all -> nothing to prove -> allow.
   if printf '%s' "$FLAG" | grep -qiE 'required' && ! printf '%s' "$FLAG" | grep -qiE 'skipped'; then
     if ! grep -qiE "$ISSUE_ID.*unit.*green" "$PROGRESS" 2>/dev/null; then

@@ -126,6 +126,38 @@ run "no backlog entry -> fail-open allow" ALLOW "$d" "$(json_worker "$d" 'Outcom
 d="$BASE/t-req-esc"; make_tdd "$d" 'required' '- FR-1: nothing yet.'
 run "required flag but honest blocked"    ALLOW "$d" "$(json_worker "$d" 'Outcome: blocked — fixture missing.')"
 
+# ---- the SHIPPED backlog shape, not just the flat one above ----
+# make_tdd writes the flag inline under a bare `## Issue` heading. sdd-phase-opener does NOT: it writes
+# `### What to build` / `### Acceptance criteria` / `### Inner loop (TDD)` subsections, with the flag VALUE
+# on the line after its subheading. Both differences broke the check independently — the entry was truncated
+# at the first `###`, and the flag line captured was the subheading, which carries no value. A live run
+# landed a `required` issue with no checkpoint and nothing complained. These cases pin the real shape.
+make_tdd_sub() {
+  local d="$1" flag="$2" prog="$3"
+  make_worker "$d" withtest
+  mkdir -p "$d/docs/phases/phase-1"
+  { printf '## Issue FR-1 — parse the thing\nStatus: todo\n\n'
+    printf '### What to build\nA parser for the thing.\n\n'
+    printf '### Acceptance criteria\n```gherkin\nScenario: it parses\n  Given a thing\n  When parsed\n  Then it works\n```\n\n'
+    printf '### Inner loop (TDD)\n`%s`\n\n### Blocked by\nNone — can start immediately\n\n' "$flag"
+    printf '## Issue FR-2 — unrelated slice\nStatus: todo\n\n### Inner loop (TDD)\n`skipped — config only`\n\n### Blocked by\n- FR-1\n'
+  } > "$d/docs/phases/phase-1/backlog.md"
+  printf '# PROGRESS\n\n## Worklog\n%s\n' "$prog" > "$d/docs/PROGRESS.md"
+}
+d="$BASE/t-sub-missing"; make_tdd_sub "$d" 'required' '- FR-1: outer scenario green.'
+run "SHIPPED shape: required, NO checkpoint" BLOCK "$d" "$(json_worker "$d" 'Outcome: green — landed done.')"
+
+d="$BASE/t-sub-ok"; make_tdd_sub "$d" 'required' '- FR-1: unit "tokenize" green; next: parse rows.'
+run "SHIPPED shape: required, checkpoint"    ALLOW "$d" "$(json_worker "$d" 'Outcome: green — landed done.')"
+
+d="$BASE/t-sub-skip"; make_tdd_sub "$d" 'skipped — declarative config, the scenario covers it' '- FR-1: outer green.'
+run "SHIPPED shape: skipped needs nothing"   ALLOW "$d" "$(json_worker "$d" 'Outcome: green — landed done.')"
+
+# The subheading form makes FR-2 a real decoy: it sits after FR-1 and carries `skipped`. An entry extraction
+# that overshoots FR-1's boundary would read FR-2's flag and wrongly allow.
+d="$BASE/t-sub-decoy"; make_tdd_sub "$d" 'required' '- FR-1: outer scenario green.'
+run "SHIPPED shape: FR-2 decoy not read"     BLOCK "$d" "$(json_worker "$d" 'Outcome: green — landed done.')"
+
 # The check must survive the worker having already merged and left the issue branch (serial auto-merge):
 # with no issue/* branch to read, the issue id comes from the cursor's Doing field.
 cursor_doing(){ printf '<!-- SDD-CURSOR -->\n- Phase: 1\n- Doing: %s\n- Next: none\n- Stop-reason: none\n<!-- /SDD-CURSOR -->\n' "$1"; }

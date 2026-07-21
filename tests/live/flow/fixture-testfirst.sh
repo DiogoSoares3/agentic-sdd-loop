@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# Faixa B · flow — GUARD fixture. An issue is IN FLIGHT (cursor `Doing: FR-1`, its branch created) but the
-# repo is left checked out on `develop` — the exact state the issue-branch guard exists for. The chain then
-# asks for an implementation edit right there (must be DENIED) and again from the issue branch (must PASS).
+# Faixa B · flow — TEST-FIRST fixture. The one guard whose blocking direction the live suite never exercised.
+# `guard` covers the BRANCH hook (wrong branch); this covers `sdd-enforce-test-first.sh` (right branch, no
+# test committed yet), which is the hook that makes "BDD outer test before implementation" mechanical.
+#
+# The repo is left in the exact state the guard exists for: ON the issue branch, cursor `Doing: FR-1`,
+# integrity `+hook`, and NOTHING test-shaped committed on the branch vs `develop`. `tests/` ships with a
+# .gitkeep only — the guard diffs the branch against the integration branch, so a pre-existing suite would
+# not satisfy it, but an empty dir keeps pytest's own behaviour unambiguous.
+#
 # Pure setup: no model, no network.
 #
-# Usage:  bash fixture-guard.sh [WORKDIR]     (prints WORK=… / PROJ=… / SETTINGS=… on the last lines)
+# Usage:  bash fixture-testfirst.sh [WORKDIR]   (prints WORK=… / PROJ=… / SETTINGS=… on the last lines)
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$HERE/../../.." && pwd)"
@@ -12,7 +18,7 @@ REPO="$(cd "$HERE/../../.." && pwd)"
 
 WORK="${1:-$(mktemp -d)}"
 PLUGIN_HOOKS="${PLUGIN_HOOKS:-$REPO/plugins/sdd-loop/hooks}"
-PROJ="$WORK/guard-proj"; HOOKLOG="$WORK/hooklog.txt"
+PROJ="$WORK/testfirst-proj"; HOOKLOG="$WORK/hooklog.txt"
 rm -rf "$PROJ"; mkdir -p "$PROJ/docs/phases/phase-1" "$PROJ/docs/adrs" "$PROJ/src/calc" "$PROJ/tests" "$PROJ/.sdd"
 : > "$HOOKLOG"
 
@@ -20,7 +26,7 @@ cat > "$PROJ/docs/PRD.md" <<'EOF'
 # PRD — calc (VALIDATED)
 ## Requirements
 ### Functional (FR-n)
-- `FR-1` — `apply("subtract", a, b)` returns the integer difference, through the operation registry.
+- `FR-1` — `apply("add", a, b)` returns the sum of the two operands.
 ## Definition of done
 - [ ] `python3 -m pytest -q` green → `FR-1`
 EOF
@@ -45,7 +51,7 @@ Solo maintainer — simple > flexible.
 Both baselines validated — OPEN.
 
 ## Vertical slice
-`register an op → apply() dispatch → pytest`.
+`registered op → apply() dispatch → pytest`.
 
 ## Issue granularity
 One demoable behaviour; ~300 LOC anchor.
@@ -63,7 +69,7 @@ None — pure functions.
 Dependency order, must-first.
 
 ## Phase roadmap (derived; validated once, before the first PLAN)
-- Phase 1 — Registry ops: `FR-1` · DoD: pytest green
+- Phase 1 — Addition: `FR-1` · DoD: pytest green
 
 ## Test command(s)
 - Slice command: `python3 -m pytest -q`
@@ -88,45 +94,63 @@ Dependency order, must-first.
 - Durable state: `docs/PROGRESS.md`.
 EOF
 
-cat > "$PROJ/docs/phases/phase-1/backlog.md" <<'EOF'
-# Phase 1 backlog — Registry ops
+cat > "$PROJ/docs/phases/phase-1/prd.md" <<'EOF'
+# Phase 1 — Addition
 
-## Issue FR-1 — subtract through the registry
+## Realizes (requirement IDs)
+`FR-1`
+
+## Seam(s) touched
+`OPERATIONS` + `apply()` in `src/calc/__init__.py`.
+
+## Depends on
+None — first phase.
+
+## DoD gate (this phase)
+- [ ] `apply("add", 2, 3)` returns `5` → `FR-1`
+EOF
+
+cat > "$PROJ/docs/phases/phase-1/backlog.md" <<'EOF'
+# Phase 1 backlog — Addition
+
+## Issue FR-1 — add two numbers through the registry
 Status: doing
+
+### What to build
+Register `add` in `OPERATIONS` so `apply("add", a, b)` returns the sum.
 
 ### Acceptance criteria
 ```gherkin
-Scenario: subtract resolves through the registry
-  Given the calc registry
-  When apply is called with "subtract", 5 and 3
-  Then the result is 2
+Scenario: a user adds two numbers through the calculator
+  Given the calc package as installed
+  When apply is called with "add", 2 and 3
+  Then the result is 5
 ```
 
 ### Inner loop (TDD)
-`required`
+`skipped — one arithmetic behaviour; the scenario covers it end to end`
 
 ### Blocked by
 None — can start immediately
+
+### Touches
+`src/calc/__init__.py`
 EOF
 
 write_cursor "$PROJ/docs/PROGRESS.md" 1 FR-1 none none \
-  "FR-1 (subtract): branch created, build in flight."
+  "FR-1: branch created and checked out, nothing committed on it yet."
 
-# A test already exists and is committed, so the TEST-FIRST guard is satisfied — this scenario must isolate
-# the BRANCH guard, not trip over a different one.
 printf 'OPERATIONS = {}\n\n\ndef apply(op, a, b):\n    return OPERATIONS[op](a, b)\n' > "$PROJ/src/calc/__init__.py"
-printf 'from calc import apply\n\n\ndef test_subtract():\n    assert apply("subtract", 5, 3) == 2\n' > "$PROJ/tests/test_subtract.py"
+: > "$PROJ/tests/.gitkeep"
 
 git_init "$PROJ"
-git -C "$PROJ" checkout -q -b issue/FR-1-subtract
-git -C "$PROJ" checkout -q develop        # issue in flight, but the WRONG branch is checked out
+git -C "$PROJ" checkout -q -b issue/FR-1-add     # on the branch, and it carries NO commits vs develop
 
 write_settings "$WORK" "$PLUGIN_HOOKS" "$HOOKLOG"
 
-# Baseline of the seam AS COMMITTED ON develop. The invariant under test is that nothing unguarded reaches
-# the integration branch — not that the working tree never moves, since a correctly-guarded agent is told to
-# recover by checking out its issue branch (which legitimately changes the working tree).
-git -C "$PROJ" show develop:src/calc/__init__.py | sha256sum | awk '{print $1}' > "$WORK/seam.sha256"
+# The seam AS COMMITTED at the branch base. Turn 1 must leave it untouched: no implementation may be
+# committed before a test is.
+git -C "$PROJ" show HEAD:src/calc/__init__.py | sha256sum | awk '{print $1}' > "$WORK/seam.sha256"
 
 echo "PROJ=$PROJ"
 echo "SETTINGS=$WORK/settings.json"

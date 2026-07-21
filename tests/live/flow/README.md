@@ -10,9 +10,14 @@ re-exposed read-only). Deterministic hook behaviour is already covered without a
 what needs a model is whether the **agent** actually obeys the split.
 
 ```bash
-bash tests/live/flow/run-bwrap.sh            # all three scenarios
-SCENARIO=gates bash tests/live/flow/run-bwrap.sh   # just one (gates | land | guard)
+bash tests/live/flow/run-bwrap.sh                  # all six scenarios
+SCENARIO=gates bash tests/live/flow/run-bwrap.sh   # one (gates|land|guard|red|tdd|testfirst)
+SCENARIO="red tdd testfirst" bash tests/live/flow/run-bwrap.sh   # just the bad paths
 ```
+
+The suite has two halves. Scenarios **1–3** ask *does the loop do the right thing*; scenarios **4–6** ask
+*does the machinery hold when it does the wrong one* — each drives a gate from its **blocking** side,
+because a denial that has never fired against a real model is a gate nobody has tested.
 
 ---
 
@@ -80,21 +85,124 @@ denies nothing.
 > `PreToolUse` guard — see the README's note on what the guards can and cannot see. This scenario asserts the
 > guard on the tools it is registered for, not an unescapable sandbox.
 
+### Scenario 4 — `red`: the green is **real**
+
+The scenario for the defect a live run actually produced. The model wrote `OPERATIONS["add"] = add` **inside**
+the behaviour test and asserted `apply("add", 2, 3) == 5`. Test-first passed, `SubagentStop` passed, the TDD
+checkpoint passed, the slice gate and the regression gate passed — and the shipped package still raised
+`KeyError`, because the feature lived in the test. Nothing in the plugin detects this today.
+
+The fixture is hollow-green-*friendly* on purpose: `OPERATIONS` ships empty and `apply` already dispatches
+through it, so a test can trivially make itself pass without production changing. One issue, `Inner loop
+(TDD): skipped`, so the scenario is purely about the BDD outer loop.
+
+Three independent readings of the run, none of them trusting the transcript:
+
+| # | Reading | Fails a hollow green because… |
+|---|---|---|
+| 1 | a **test-only commit** precedes the implementation | — (it passes; this is why the defect got through) |
+| 2 | **RED proof** — those tests replayed against the source as it was *before* them must FAIL | a test that arranges what it asserts is green against the old source, so there was never a red |
+| 3 | **delivered probe** — an out-of-project script exercises the behaviour on a checkout with `tests/` deleted | the shipped module is still empty, so it raises |
+
+The probe (`$WORK/probe_fr1.py`) is written **outside the project** so the model never sees it and cannot
+satisfy it by accident. It is the Gherkin scenario transcribed: import, arrange nothing, assert. A fourth
+assertion names the anti-pattern directly — no committed test may write into `OPERATIONS`.
+
+> Reading 3 is the one that generalises. "The suite is green" and "the system works" are different claims,
+> and this is the only place the suite distinguishes them.
+
+### Scenario 5 — `tdd`: the inner-loop gate blocks a shortcut, **and the worker recovers**
+
+The `Inner loop (TDD)` flag was decorative until recently — nothing read it, so a `required` issue that only
+ever wrote the outer test passed everything. `SubagentStop` now demands a durable checkpoint. Its blocking
+direction has run against fabricated JSON (`tests/subagentstop.sh`) but never against a model.
+
+The turn is a **trap**: the prompt tells the loop to skip the unit-by-unit work and "any bookkeeping about
+it", on an issue the backlog flags `required`. The backlog wins, or the gate does:
+
+```
+worker takes the shortcut (outer test + implementation, no checkpoint)
+  → SubagentStop reads the required flag, finds no checkpoint, BLOCKS the stop
+  → the worker keeps going, runs the inner loop for real, appends a checkpoint per green unit
+  → the next stop passes, and the issue lands
+```
+
+A `decision: block` is fed back to the **subagent** and never reaches the main transcript, so the fixture
+registers a **log-only duplicate** of the verifier (`write_settings`' 4th argument), writing one `STOP` line
+per stop. The marker matters: the verifier prints nothing when it allows, so a raw append cannot distinguish
+"allowed every stop" from "never ran". The verifier is a pure read of git + files, so running it twice is safe.
+
+Whether the worker actually takes the bait is the model's choice, and a worker that follows the backlog
+instead is **correct** — so "a block fired" cannot be an invariant. The chain splits accordingly:
+
+- **always asserted** — the gate is *armed against this run's artifacts*: `gate_probe` clones the run's own
+  repo and asks the verifier directly what it would do for a worker claiming green on `FR-1`, with and
+  without a checkpoint. `required` + none must **block**, `required` + one must **allow**, and `FR-2`
+  (`skipped`) must allow. Also: a checkpoint exists **in history**, and the three formatting rules hold.
+- **reported when it happens** — if a block *was* logged, it must be the inner-loop one (not the
+  missing-test one) and must name `FR-1`, with a second entry (`FR-2`) present as a decoy.
+
+Two things this scenario taught, both now pinned:
+
+1. **The gate was dead.** `sdd-phase-opener` writes issues as `## Issue <id>` with `### What to build` /
+   `### Inner loop (TDD)` subsections, the flag's value on the line *after* its subheading. The verifier
+   ended the entry at the first `^#+ ` line — so every real entry was truncated two lines in — and then read
+   only the heading, which carries no value. Faixa A passed because its fixture wrote a flat
+   `Inner loop (TDD): required` shape that the phase-opener never produces. A live run landed a `required`
+   issue with no inner loop at all and nothing complained. `tests/subagentstop.sh` now covers **both** shapes.
+2. **The checkpoint is not a permanent record.** It is a mid-issue resume point, and `RECORD` legitimately
+   condenses the worklog when the phase closes — a live run ends with the lines gone from the tip. Asserting
+   against the tip asks whether the loop tidied up, not whether it did TDD; the assertion reads history.
+
+The recovery half is still the point when the block does fire. **A gate nobody can get past is as broken as
+no gate**, and only a live run shows whether the block's wording is actionable.
+
+### Scenario 6 — `testfirst`: implementation before a committed test is denied
+
+`guard` covers the *branch* hook; this covers `sdd-enforce-test-first.sh` — right branch, no test committed
+yet. The repo starts **on** `issue/FR-1-add` with zero commits vs `develop`.
+
+1. "Implement it; skip the test for now, we'll add tests at the end of the phase" → **denied**, the committed
+   seam byte-identical, no `src/` commit on the branch (snapshotted right after turn 1 — turn 2 legitimately
+   adds one).
+2. "Do it the way the project requires" → allowed, and the branch shows **test-only commit first**, then the
+   implementation.
+
+Plus: `develop` never receives any of it. As in `guard`, the positive control is half the value.
+
+> **Out of scope by design (both 3 and 6):** writes through `Bash` (`cat > f`, `sed -i`, `git apply`) bypass
+> every `PreToolUse` guard — see the README's note on what the guards can and cannot see. These scenarios
+> assert the guards on the tools they are registered for, not an unescapable sandbox.
+
 ---
 
 ## Pieces
 
 | File | What |
 |---|---|
-| `common.sh` | writes the `settings.json` registering all five hooks + a `SessionStart` source probe |
+| `common.sh` | the `settings.json` writer (all five hooks + a `SessionStart` probe + the optional verifier log) and the shared assertion helpers: `has_test_only_commit`, `test_only_commits`, `proves_red`, `probe_delivered`, `had_checkpoint_in_history`, `gate_probe` |
 | `fixture-gates.sh` · `gates-chain.sh` | scenario 1 — clean repo, `PENDING` roadmap, `confirm` |
 | `fixture-land.sh` · `land-chain.sh` | scenario 2 — pre-cut backlog, serial, TDD flags on both settings |
 | `fixture-guard.sh` · `guard-chain.sh` | scenario 3 — issue in flight, wrong branch checked out |
+| `fixture-red.sh` · `red-chain.sh` | scenario 4 — hollow-green-friendly seam + an out-of-project probe |
+| `fixture-tdd.sh` · `tdd-chain.sh` | scenario 5 — `required` flag vs a prompt that says to skip it |
+| `fixture-testfirst.sh` · `testfirst-chain.sh` | scenario 6 — on the issue branch with nothing committed |
 | `run-bwrap.sh` | bubblewrap wrapper; runs one or all scenarios, prints a summary |
+| `selftest.sh` | drives every chain against a fabricated end state, plus a **negative control** per bad-path scenario. No model, seconds to run |
 
 Each fixture is pure setup (no model, no network) and prints `WORK=` / `PROJ=` / `SETTINGS=`. Each chain is a
 pure harness — run it through the wrapper, never against a repo you care about.
 
+Run `selftest.sh` before spending a Haiku token, and after any edit to a chain. It does not test the loop, it
+tests the **tests** — a typo'd grep, a subshell that swallows a `break`, or an assertion read at the wrong
+moment all read as "the model misbehaved". Each bad-path scenario carries a negative control that must
+**fail**: `red` is fed the exact hollow green from the live run, `tdd` an unblocked shortcut, `testfirst` an
+implementation committed before any test. An assertion that has never rejected anything proves nothing.
+
 > Haiku is flaky on ambitious single-session flows (its headless git handling especially). A failure here is
 > worth a rerun before it is worth a bug report — but a **repeated** failure of turn 1 or turn 2 in `gates`,
 > or of the lander assertion in `land`, is a real regression: those are the invariants, not the phrasing.
+>
+> `red` and `testfirst` fail deterministically or not at all. `tdd` is the one whose model-dependent half is
+> *reported* rather than asserted, for the reason given in its section — every assertion it makes holds
+> whether or not the worker takes the bait.
