@@ -104,8 +104,11 @@ make_tdd() {
   local d="$1" flag="$2" prog="$3"
   make_worker "$d" withtest
   mkdir -p "$d/docs/phases/phase-1"
-  printf '## Issue FR-1 — parse the thing\nInner loop (TDD): %s\nBlocked by: None\n' "$flag" \
-    > "$d/docs/phases/phase-1/backlog.md"
+  # Two entries: the branch is issue/FR-1-thing, so a naive "cut at the first dash" would look up `FR`
+  # and could land on either. The id must resolve to FR-1 exactly.
+  { printf '## Issue FR-1 — parse the thing\nInner loop (TDD): %s\nBlocked by: None\n\n' "$flag"
+    printf '## Issue FR-2 — unrelated slice\nInner loop (TDD): skipped — config only\nBlocked by: FR-1\n'
+  } > "$d/docs/phases/phase-1/backlog.md"
   printf '# PROGRESS\n\n## Worklog\n%s\n' "$prog" > "$d/docs/PROGRESS.md"
 }
 d="$BASE/t-req-missing"; make_tdd "$d" 'required' '- FR-1: outer scenario green.'

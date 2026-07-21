@@ -93,7 +93,7 @@ case "$PROGRESS_REL" in /*) PROGRESS="$PROGRESS_REL";; *) PROGRESS="$ROOT/$PROGR
 # and if that is `none` too, we genuinely cannot tell which issue this was: fail open.
 ISSUE_ID=""
 case "$BRANCH" in
-  issue/*) ISSUE_ID="$(printf '%s' "${BRANCH#issue/}" | sed -E 's/-.*$//')" ;;
+  issue/*) ISSUE_ID="${BRANCH#issue/}" ;;                        # e.g. FR-1-add — trimmed to the id below
   *) CURSOR="$(awk '/<!--[[:space:]]*SDD-CURSOR/{f=1;next} /<!--[[:space:]]*\/SDD-CURSOR/{f=0} f' "$PROGRESS" 2>/dev/null || true)"
      ISSUE_ID="$( { printf '%s\n' "$CURSOR" \
          | grep -iE '^[[:space:]]*[-*][[:space:]]*\**[[:space:]]*Doing[[:space:]]*\**[[:space:]]*:' \
@@ -108,10 +108,19 @@ esac
 if [ -n "$ISSUE_ID" ]; then
   PHASES_REL="$(prof_path 'Phases dir')"; : "${PHASES_REL:=docs/phases}"; PHASES_REL="${PHASES_REL%/}"
   case "$PHASES_REL" in /*) PH_DIR="$PHASES_REL";; *) PH_DIR="$ROOT/$PHASES_REL";; esac
-  # The issue's backlog entry: from the heading naming this id up to the next heading.
-  ENTRY="$(cat "$PH_DIR"/*/backlog.md 2>/dev/null \
-            | awk -v id="$ISSUE_ID" 'tolower($0) ~ ("^#+ .*(^|[^a-z0-9])" tolower(id) "([^a-z0-9]|$)") {f=1;print;next} /^#+ /{f=0} f' \
-            || true)"
+  BACKLOGS="$(cat "$PH_DIR"/*/backlog.md 2>/dev/null || true)"
+
+  # The branch carries `<id>-<slug>` and ids routinely contain dashes (FR-1, P1-3, E2-7), so the id cannot
+  # be cut at the first dash. Try progressively shorter dash-delimited prefixes — FR-1-add, FR-1, FR — and
+  # keep the first that actually names a backlog entry. A bare cursor id (no slug) matches on the first try.
+  ENTRY=""; CAND="$ISSUE_ID"
+  while [ -n "$CAND" ]; do
+    ENTRY="$(printf '%s\n' "$BACKLOGS" \
+              | awk -v id="$CAND" 'tolower($0) ~ ("^#+ .*(^|[^a-z0-9])" tolower(id) "([^a-z0-9]|$)") {f=1;print;next} /^#+ /{f=0} f' \
+              || true)"
+    [ -n "$ENTRY" ] && { ISSUE_ID="$CAND"; break; }
+    case "$CAND" in *-*) CAND="${CAND%-*}" ;; *) CAND="" ;; esac
+  done
   FLAG="$(printf '%s' "$ENTRY" | grep -iE 'inner loop' | head -n1 || true)"
   # Only `required` is checked. `skipped`, an absent flag, or no entry at all -> nothing to prove -> allow.
   if printf '%s' "$FLAG" | grep -qiE 'required' && ! printf '%s' "$FLAG" | grep -qiE 'skipped'; then
