@@ -26,10 +26,18 @@ scope + `FR-n`/`NFR-n` requirements + Definition of Done, validated with stakeho
 **`ARCHITECTURE.md`** (technical truth — seams, components, a Mermaid container+seams diagram, ADR index,
 validated with engineers). Everything below is **derived**: phase PRDs, backlog, tests, code.
 
+- **ROADMAP** — once both baselines are validated and **before anything is built**, `/sdd` derives the
+  project's epics in order from the root PRD and **shows you the whole plan** for a quick ok, recording it in
+  the profile's **Phase roadmap** slot. You see the shape of the project up front instead of one phase at a
+  time. It is **indicative**: every phase is still re-derived at PLAN, and a divergence (an ADR reordered a
+  dependency) is *reported* with its reason, never a block. A structural PRD/ARCHITECTURE amendment refreshes
+  it on the spot.
 - **PLAN** — the bounded **`sdd-phase-opener`** subagent cuts the next epic from the root PRD in
   **dependency order**, with **MoSCoW priority as the must-first tiebreak**, and writes a thin **phase PRD**
   (`docs/phases/phase-N/prd.md`) + backlog — a projection that references the baselines by ID/seam, never a
-  second full PRD.
+  second full PRD. The cut is then **presented to you** — scope, DoD, and the slices in order — for a
+  **one-time approval per phase** (`backlog review: confirm`, the default; `auto` skips the wait but still
+  reports). Approve once and the whole phase builds through without further prompts.
 - **`/to-issues`** breaks the phase into **vertical slices** — each **one demoable tracer bullet** (~300
   LOC as the default size anchor) — each carrying a **Gherkin `Scenario:`** (`/bdd`) as its acceptance test.
 - **BUILD** — the **main session is the orchestrator**; it dispatches issues **one at a time to a bounded
@@ -59,8 +67,8 @@ guesses ~40% context" trigger was impossible and is gone; there is no `PreCompac
 can't inject context into the model). Recovery = `SessionStart` re-inject **+** RECORD-after-every-issue
 keeping `PROGRESS.md` current. A **clean boundary** (phase drained / project done) needs no handoff — files
 fully describe it. State lives entirely in files, so any fresh context resumes from exact position. With
-**`auto-merge` + `continuation: auto`** the loop runs unattended, stopping only for a genuine PRD/ARCHITECTURE
-decision.
+**`auto-merge` + `continuation: auto` + `backlog review: auto`** the loop runs unattended, stopping only for a
+genuine PRD/ARCHITECTURE decision.
 
 ## Architecture — main orchestrator + bounded subagents + hooks
 
@@ -176,9 +184,10 @@ any slot still holds placeholder text. The knobs:
 | **Fakes / fixtures** | — | how tests avoid live infra |
 | **Definition of Done** | — | per-phase gates |
 | **Phase-cutting rule** | — | how epics are sized & ordered |
+| **Phase roadmap** | `PENDING` | the project's epics in order — **derived** from the validated PRD and okayed by you at the spec gate, before the first phase is built. **Indicative:** each phase is still re-derived at PLAN; a divergence is reported, not blocked. The one slot that may read `PENDING` when `/sdd` starts |
 | **Test command(s)** | — | the command that proves a slice green |
 | **Continuation mode** | `ask` | gate at a **boundary/resume**: `ask` (alive session shows the resume cursor + next action and asks before dispatching) \| `auto` (unattended; proceed without asking) |
-| **Backlog review** | `auto` | gate at **PLAN** (phase scope): `auto` (build straight away) \| `confirm` (pause after `/to-issues` to approve/edit the backlog) |
+| **Backlog review** | `confirm` | gate at **PLAN** (phase scope): `confirm` (present the cut phase — scope + DoD + slices in order — for a **one-time** approval covering the whole phase, never per issue) \| `auto` (build straight away). The cut is reported either way |
 | **Integrity enforcement** | `prose+git +hook` | base + shipped `PreToolUse` guard (deny impl edits before a **BDD test** is committed on an `issue/*` branch — gates the always-required outer test, not the TDD flag). Add `+verifier` (agent) for a diff re-read. `SubagentStop` verify is always on regardless. |
 | **PR provider** | `none` | `none` (local merge) \| `gh` \| `bitbucket-mcp` |
 | **Merge policy** | `auto-merge` | `auto-merge` (unattended) \| `human-review` (PR gate; needs a provider) |
@@ -207,6 +216,10 @@ Latency p95 < 100ms on the redirect hot path — nothing lands that degrades rea
 ## Test command(s)
 pytest -q
 
+## Phase roadmap
+- Phase 1 — Redirect hot path: FR-1, NFR-1 · DoD: p95 < 100ms under the load fixture
+- Phase 2 — Link management: FR-2, FR-3 · DoD: a link survives create → resolve → expire
+
 ## Loop
 - Continuation mode: auto
 - Backlog review: auto
@@ -221,9 +234,10 @@ pytest -q
 ```
 
 For an **unattended** run, the fully-autonomous combination is `merge policy: auto-merge` +
-`continuation: auto` + a `/schedule` watchdog. For a **supervised** run, keep `continuation: ask` (the
-default — it asks before continuing at each boundary) and/or a **human gate per phase** via `merge policy:
-human-review` (with a provider) and/or `backlog review: confirm`.
+`continuation: auto` + `backlog review: auto` + a `/schedule` watchdog. For a **supervised** run, keep the
+defaults — `backlog review: confirm` (approve each phase's scope once, before it is built) and
+`continuation: ask` (ask before continuing at each boundary) — and optionally add a PR gate via `merge
+policy: human-review` (with a provider).
 
 ## Use
 
@@ -232,7 +246,7 @@ human-review` (with a provider) and/or `backlog review: confirm`.
 # --- author & validate the two baselines (the spec gate) ---
 # have the material?  /to-prd synthesizes PRD.md;  write ARCHITECTURE.md from templates/arch/ + engineer
 # nothing yet?        /grill-me authors them by interview — stakeholder for PRD, engineer for ARCHITECTURE
-/sdd               # run the loop: PLAN phase → select slice → BDD+TDD → land → record → gate → continue
+/sdd               # ok the phase roadmap, then loop: PLAN phase → ok its scope → BDD+TDD → land → record → gate
 ```
 
 `/sdd` reads `.sdd/profile.md` and **refuses to build until the spec gate** (validated PRD +

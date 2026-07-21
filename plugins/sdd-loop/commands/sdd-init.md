@@ -66,6 +66,10 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
    - **Fakes/fixtures** — how tests avoid live infra.
    - **DoD gates** — what "done" means per phase.
    - **Phase-cutting rule** — how epics are sized and ordered.
+   - **Phase roadmap** — *do not fill this one, and do not interview for it.* It is derived from the
+     **validated** `PRD.md`, which is still a skeleton at this point. Leave the slot's `PENDING` line as-is;
+     `/sdd` derives the phases at the spec gate and gets the user's ok on the macro plan before the first
+     phase is built. Mention that this is coming, so the user isn't surprised by the question later.
    - **Test command(s)** — the exact command that proves a slice green.
    - **Git strategy** — protected branch (default `main`, never committed to), integration branch
      (default `develop`), issue branch naming (`issue/<id>-<slug>`), **PR provider** (`none` default |
@@ -82,10 +86,11 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
      `needs-decision` / `needs-revalidation` stop surfaces to a human either way. For unattended (`auto`)
      runs, offer to register a **scheduled watchdog** (`/schedule` running `/sdd`) that re-triggers after a
      session death.
-   - **Backlog review** — `auto` (default; the cut phase backlog goes straight to build) or `confirm`
-     (a **one-time** pause after `/to-issues` to approve/edit the backlog + how issues run, then build
-     proceeds straight through — it does **not** re-pause before each issue, though a `blocked` /
-     `needs-decision` / `needs-revalidation` escalation still halts the loop for a human).
+   - **Backlog review** — `confirm` (default; once a phase is cut, its scope + slice list are presented for a
+     **one-time** approval before any build — then the loop runs the **whole** phase straight through, never
+     re-asking per issue; only an escalation or the phase draining stops it) or `auto` (the cut goes straight
+     to build — for unattended runs). Either way the cut is **reported** to the user; the knob only decides
+     whether the loop waits for an ok.
    - **Integrity enforcement** — `prose+git +hook` (**default**): the base (`prose+git`: immutable scenario,
      RED proof, test-first commit, clean re-run) **plus** the shipped `PreToolUse` guard (`+hook`: on an
      `issue/*` branch, deny an implementation edit until a **behaviour/BDD test** is committed — this gates
@@ -103,9 +108,11 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
    For each, propose a recommended default for the detected project type; let the user correct it.
    Leave **no** placeholder behind: every `<…>` token and every `> e.g.` example line in `.sdd/profile.md`
    must end up replaced with a real, project-specific value — `/sdd` refuses to run while any slot still
-   holds template text.
+   holds template text. **The one exception is `## Phase roadmap`**, which stays `PENDING` on purpose (see
+   above); `/sdd` tolerates that single marker and resolves it at the spec gate.
 
 4. **Tell the user the next move:** draft & validate `PRD.md` and `ARCHITECTURE.md`, then run `/sdd`
-   to start the loop. Nothing gets built before the spec gate. If the repo has **no** PRD/ARCHITECTURE
+   to start the loop — which will first lay out the project's phases for them to sanity-check, and then ask
+   them to ok each phase's scope before it is built. Nothing gets built before the spec gate. If the repo has **no** PRD/ARCHITECTURE
    material to synthesize from, point them at **`/grill-me`** to author these by interview — the
    **stakeholder** for `PRD.md`, the **engineer** for `ARCHITECTURE.md` — before `/sdd`.

@@ -14,7 +14,7 @@ sub-agents**. The job fits one context window by design — cut, write, stop.
 > The `docs/…` locations below are **defaults**. The real ones come from `.sdd/profile.md` → **Paths**
 > (Baselines / Durable state / Phases dir); a project may relocate them out of `docs/`. Read the profile
 > first and use whatever it states — for both the files you read and the ones you write.
-- `.sdd/profile.md` — régua, phase-cutting rule, vertical slice, paths, knobs.
+- `.sdd/profile.md` — régua, phase-cutting rule, **`## Phase roadmap`**, vertical slice, paths, knobs.
 - `docs/PRD.md` (root, **validated**) — requirement IDs (`FR-n`/`NFR-n`), MoSCoW, DoD.
 - `docs/ARCHITECTURE.md` + `docs/adrs/*` — seams, dependency order, closed decisions.
 - `docs/PROGRESS.md` + existing `docs/phases/*/backlog.md` — what is already `done`.
@@ -25,6 +25,12 @@ sub-agents**. The job fits one context window by design — cut, write, stop.
    the next *undone* group of requirement IDs. Do **not** re-read prior phase PRDs — their scope is realized
    and recorded; glance only if a boundary is genuinely ambiguous. One phase = one epic = one demoable
    vertical-slice group, anchored to specific requirement IDs + DoD.
+   **Check the result against the profile's `## Phase roadmap`** — the macro plan the user validated at the
+   spec gate. It is **indicative**: your derivation wins (dependency order and the current baselines are the
+   truth), so **never** bend a cut to match it and never escalate over a mismatch. But if this phase differs
+   from the roadmap's line for it — different IDs, a different order, a phase that split or merged — **report
+   the difference and the reason** in your return, so the orchestrator can surface it while the user approves
+   the phase. A silent divergence from the plan they signed off on is the one thing to avoid.
 2. **Write the phase PRD** `docs/phases/phase-N/prd.md` from `${CLAUDE_PLUGIN_ROOT}/templates/prd/phase-PRD.template.md`
    — a **thin projection** that **references** the baselines by requirement ID / seam. Do **not** restate
    Problem/Solution/architecture. Fill: the IDs this epic realizes, their stories, the seam(s) touched, this
@@ -57,9 +63,20 @@ If cutting the phase requires a decision **no baseline covers** (structural / cr
 do **not** invent it: return `needs-decision` + the exact question. The orchestrator escalates to the human
 (`/grill-me` → ADR / PRD amendment) and re-dispatches you.
 
-## Return (compact status only — the orchestrator relays it)
-One line: `phase N opened · <M> issues · docs/phases/phase-N/` — or `needs-decision: <question>`.
-Never build an issue. Never spawn a sub-agent.
+## Return (compact — the orchestrator relays it to the user, so it must stand on its own)
+The orchestrator presents your cut to the user (and, under `Backlog review: confirm`, asks them to approve
+it) **without re-reading your files** — so return enough for that, and nothing more:
+
+- **Status line:** `phase N opened · <M> issues · docs/phases/phase-N/`.
+- **Scope:** the epic in one sentence + the requirement IDs it realizes.
+- **DoD gate:** this phase's checkable items, one line each.
+- **Slices:** one line per issue — `<id> — <what it demos>` in the order they will run (blockers first),
+  marking any that is `Inner loop (TDD): skipped`.
+- **Roadmap divergence:** `matches the roadmap`, or what differs from the roadmap's line for this phase and
+  **why** (the ADR / amendment / dependency that moved it).
+
+Write those in **plain product/engineering terms**, not plugin jargon — a stakeholder reads them. Or return
+`needs-decision: <question>` instead. Never build an issue. Never spawn a sub-agent.
 
 Your stop is verified: a `SubagentStop` guard re-reads the filesystem at exit and **blocks** a "phase opened"
 return if no non-empty `backlog.md` exists under `docs/phases/`. So finish writing the phase PRD + backlog

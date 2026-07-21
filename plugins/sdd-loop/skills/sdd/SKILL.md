@@ -32,6 +32,10 @@ half-filled profile silently degrades every downstream decision, and since phase
 autonomous the profile is the single highest-leverage input. Only proceed once every slot carries a
 real, project-specific value.
 
+**One slot is exempt: `## Phase roadmap`.** It is derived from the *validated* `PRD.md`, which does not
+exist yet at `/sdd-init` time, so it legitimately reads `PENDING` until the spec gate fills it (below).
+`PENDING` there is not a half-filled profile — it is the state that gate exists to resolve.
+
 ## Two sources of truth
 
 - **`PRD.md`** — the **product** truth: what/why/scope/definition-of-done. **Validated with
@@ -110,13 +114,24 @@ You are always in exactly one of these states. Decide which from `PROGRESS.md`, 
   and flag it for **engineer validation**. `ARCHITECTURE.md` itself needs no writer skill — its template +
   `/grill-me` fully specify it; only the small, numbered ADRs route through the thin `/to-adr` writer.
 - **Do not proceed to SELECT until the profile's "spec gate" is satisfied.** This gate is a hard stop.
+- **Both baselines validated → derive the phase roadmap, once, before the first PLAN.** While the profile's
+  `## Phase roadmap` slot reads `PENDING`: apply the profile's **phase-cutting rule** to the validated root
+  `PRD.md` and lay out **every** epic the project is expected to run, in order — one line each: the epic, the
+  requirement IDs it realizes, and the root DoD item(s) it closes. **Present that list to the user in plain
+  product terms and get a quick ok** (adjust and re-present if they reorder or re-cut something), then write
+  it into the slot. This is the **macro** validation — the user sees the whole shape of the project before
+  anything is built, instead of discovering it one phase at a time. It is a **sketch, not a spec**: it is
+  derived, never grilled, carries no sign-off ceremony, and does not become a third baseline. Keep it to one
+  line per phase — the detail belongs to each phase's own PRD, cut just-in-time at PLAN.
 
 ### PLAN phase → phase PRD + epic backlog
 > **Internal, derived layer — no separate human sign-off.** `docs/phases/phase-N/prd.md` and its `backlog.md` are
 > the assistant's own **scrum/kanban + context-management** design, derived deterministically from the
 > two validated baselines. The **only** human-grilled/validated docs are the **root `PRD.md`**
-> (stakeholders) and **`ARCHITECTURE.md`** (engineer). Do **not** stop to ask the user to approve the
-> phase-cut or the backlog — cut them autonomously with the rules below and keep moving.
+> (stakeholders) and **`ARCHITECTURE.md`** (engineer). **Derive** the phase-cut and the backlog from those
+> baselines with the rules below — do **not** interview the user to *construct* them (that is `/grill-me`'s
+> job, and it belongs to the baselines, not here). The user's say comes **after**: the finished cut is
+> reported, and under the **Backlog review** knob (default `confirm`) approved once, before any build.
 
 **Spawn the [`sdd-phase-opener`](../../agents/phase-opener.md) subagent to do this cut** (a bounded,
 one-window job): it reads the baselines + ADRs, writes the phase PRD + backlog, and returns a compact
@@ -140,12 +155,24 @@ sent back). The steps it follows:
 - Run **`/to-issues`** on that phase PRD → append **vertical issues** to `docs/phases/phase-N/backlog.md`, each sized to
   **one demoable tracer bullet (~300 LOC anchor)**. Each issue has explicit boundaries and a **Gherkin `Scenario:`** as
   its acceptance criteria, authored via **`/bdd`** from the phase PRD + arch. This is the epic's backlog.
-- **Backlog review** (profile knob `backlog-review`, default `auto`): `auto` proceeds straight to BUILD.
-  `confirm` **pauses** here and surfaces the freshly-cut backlog for the user to approve/edit before any
-  build — an opt-in human gate on the *derived* layer (the two baselines are still the only grilled docs).
-  It is a **one-time** gate: confirm the backlog + how the issues will run **once**, then BUILD runs straight
-  through them **without pausing before each issue** — a worker's `blocked` / `needs-decision` /
-  `needs-revalidation` still **halts** the loop for a human, and the loop may surface something on its own.
+- **Backlog review** (profile knob `backlog-review`, default `confirm`): `confirm` **pauses** here and
+  surfaces the freshly-cut **phase scope + backlog together** — what this phase delivers, its DoD gate, and
+  the slices in the order they will run — for the user to approve or edit before any build. `auto` proceeds
+  straight to BUILD. This is a human gate on the *derived* layer (the two baselines are still the only
+  grilled docs).
+  **It gates the phase, not each issue.** One approval covers the whole phase: once the user says go, BUILD
+  runs **straight through the entire backlog without pausing again**, until the phase drains or a worker
+  returns `blocked` / `needs-decision` / `needs-revalidation` (which halts the loop for a human under either
+  setting). Never re-ask per issue.
+- **Whatever the knob, always *report* the cut.** Even under `auto`, present the phase scope + slice list in
+  plain product terms after the phase-opener returns, then continue. `confirm` decides whether you *wait*
+  for approval — not whether the user gets to see what was planned.
+- **Diverged from the roadmap? Say so, don't stop.** The profile's `## Phase roadmap` is **indicative**: the
+  phase-opener re-derives every cut from the baselines, and dependency order wins over the list. When the cut
+  differs from the roadmap's line for this phase, report the difference **and the reason** ("Phase 3 takes
+  `FR-7` instead of `FR-9` — ADR-0004 made `FR-9` depend on it") as part of presenting the phase. It is
+  information for the approval the user is already giving, **not** a separate gate and **not** a
+  `needs-decision`.
 
 ### BUILD phase → dispatch issues (serial by default)
 The build loop is the **issue dispatcher** — read [`dispatcher.md`](dispatcher.md); it is the loop's
@@ -306,7 +333,12 @@ open-ended — each iteration either lands an issue or hits a stop. Stop when:
 ## Change control
 
 - **Structural** (scope, v1 surface, an architectural decision) → re-validate: `PRD.md` with
-  stakeholders, `ARCHITECTURE.md` with engineers.
+  stakeholders, `ARCHITECTURE.md` with engineers. **Then refresh the phase roadmap in the same breath:**
+  re-derive the profile's `## Phase roadmap` from the amended baseline and re-present **only the phases the
+  amendment moves** for a quick ok (phases already `done` are never rewritten). Do this *at the amendment*,
+  while the human is already here — that is what keeps an indicative roadmap honest without ever stopping
+  the loop for it later. A **tactical** refinement changes no phase's scope or order, so it leaves the
+  roadmap alone.
 - **Uncovered decision** (the baselines are silent on a critical call) → **ESCALATE via `/grill-me`**
   (above), then record as an ADR or PRD amendment. This is how the spec grows without drift.
 - **Tactical** (refine an acceptance criterion, detail a contract) → allowed mid-build; record in

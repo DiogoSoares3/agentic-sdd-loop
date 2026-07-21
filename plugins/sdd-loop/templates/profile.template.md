@@ -56,6 +56,28 @@ The checklist a phase must satisfy to be done.
 ## Phase-cutting rule
 How epics are sized and ordered (dependency order, must-first, one seam group per phase).
 
+## Phase roadmap (derived; validated once, before the first PLAN)
+The project's epics in the order they are expected to run — the **macro plan the user signs off on** before
+any building, so nobody discovers the project's shape one phase at a time. Applying the rule above to the
+validated `PRD.md`, one line per phase.
+
+**Left `PENDING` by `/sdd-init`** (the PRD is still a skeleton then, so there is nothing to derive from).
+`/sdd` fills it at the **spec gate** — once both baselines are validated and before the first PLAN — by
+deriving the phases, presenting them in plain product terms, and writing them here on the user's ok. The
+`PENDING` marker is the one slot value `/sdd` tolerates; every other slot must be filled to run.
+
+**Indicative, not binding.** The `sdd-phase-opener` still re-derives each phase from `PRD.md` +
+`PROGRESS.md` + ADRs at PLAN time — dependency order wins over this list. When a cut diverges, the
+phase-opener says so (and why) as it presents the phase; the roadmap is not an amendment gate. What keeps it
+honest is change control: a **structural** amendment to `PRD.md`/`ARCHITECTURE.md` re-derives this list and
+re-presents the affected phases for a quick ok, in the same conversation as the amendment. Phases already
+`done` are never rewritten.
+
+PENDING — derived and validated at the spec gate.
+
+> - Phase 1 — <epic>: `FR-1`, `FR-2` · DoD: <the root DoD item(s) it closes>
+> - Phase 2 — <epic>: `FR-3`, `NFR-1` · DoD: <…>
+
 ## Test command(s)
 Two scopes (they may be the same command in a small project):
 - **Slice command** — proves ONE issue green (its behaviour/integration test + its units). The worker runs
@@ -97,12 +119,15 @@ Two scopes (they may be the same command in a small project):
   The `SessionStart` hook re-injects the cursor + next action deterministically either way; this knob only
   decides ask-first vs proceed.
 - **Backlog review (gate at PLAN, before BUILD):** governs the human gate on the *derived scope* of a phase.
-  - `auto` (**default**) — the `sdd-phase-opener`'s cut goes straight to BUILD.
-  - `confirm` — a **one-time** pause after the backlog is cut: the user **approves/edits the phase scope + how
-    the issues will run**, then BUILD proceeds straight through **without pausing per issue** (a worker's
-    `blocked` / `needs-decision` / `needs-revalidation` still halts it for a human). The two
-    baselines stay the only human-validated docs; this is an optional gate on the
-    derived layer.
+  - `confirm` (**default**) — a **one-time** pause once the phase is cut: the user **approves/edits the phase
+    scope (its PRD) + the backlog together**, then BUILD proceeds straight through the **whole** backlog
+    **without pausing per issue** (only a worker's `blocked` / `needs-decision` / `needs-revalidation`, or
+    the phase draining, stops it). One approval per phase — never one per issue.
+  - `auto` — the `sdd-phase-opener`'s cut goes straight to BUILD. Pick this for unattended runs (pair with
+    `Continuation mode: auto`).
+  Under **either** setting the orchestrator **reports** the cut (scope + DoD + the slices in order) in plain
+  terms; this knob only decides whether it *waits* for approval. The two baselines stay the only
+  human-validated docs — this is a lightweight gate on the derived layer.
   Orthogonal to Continuation mode: this gates *what gets built* (the plan); Continuation gates *whether to
   proceed* at a boundary.
 - **Integrity enforcement:** `prose+git +hook` (**default**) — the base (`prose+git`: immutable
