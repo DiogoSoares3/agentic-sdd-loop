@@ -9,15 +9,16 @@
 #   4. red       — the green is REAL: the test was red first, and the DELIVERED system works with no tests
 #   5. tdd       — the inner-loop checkpoint gate BLOCKS a shortcut, and the worker recovers from the block
 #   6. testfirst — the test-first guard denies implementation before a committed test, and allows it after
+#   7. bdd       — the /bdd skill routes to the RIGHT on-demand sibling per posture, and not the other one
 #
 # 4-6 are the bad-path half: 1-3 ask whether the loop does the right thing, 4-6 whether the machinery holds
 # when it does the wrong one. They are the ones worth re-running after any change to the hooks.
 #
 # Prereqs: bubblewrap (`bwrap`) · a logged-in claude CLI (`~/.claude/.credentials.json`) · network · pytest.
-# Cost: six Haiku runs (gates is three turns; testfirst two). Nothing persists outside the WORK mktemp dirs.
+# Cost: seven Haiku runs (gates three turns; testfirst and bdd two). Nothing persists outside WORK mktemps.
 #
-#   bash run-bwrap.sh                 # all six
-#   SCENARIO=land bash run-bwrap.sh   # one of: gates | land | guard | red | tdd | testfirst
+#   bash run-bwrap.sh                 # all seven
+#   SCENARIO=land bash run-bwrap.sh   # one of: gates | land | guard | red | tdd | testfirst | bdd
 #   SCENARIO="red tdd testfirst" bash run-bwrap.sh   # just the bad paths
 #   KEEP=1 bash run-bwrap.sh          # keep WORK dirs for post-mortem
 set -uo pipefail
@@ -47,7 +48,7 @@ run_scenario(){ # $1 name  -> builds a fresh WORK, runs fixture-$1 + $1-chain co
 }
 
 declare -A RC
-for s in ${SCENARIO:-gates land guard red tdd testfirst}; do
+for s in ${SCENARIO:-gates land guard red tdd testfirst bdd}; do
   echo; echo "########## SCENARIO — $s ##########"
   run_scenario "$s"; RC[$s]=$?
 done

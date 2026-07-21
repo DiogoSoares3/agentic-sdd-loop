@@ -10,6 +10,8 @@
 #   bash tests/live/flow/selftest.sh
 set -uo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(cd "$HERE/../../.." && pwd)"
+PLUGIN_DIR="${PLUGIN_DIR:-$REPO/plugins/sdd-loop}"
 PASS=0; FAIL=0
 G='\033[0;32m'; R='\033[0;31m'; N='\033[0m'
 report(){ if [ "$1" -eq 0 ]; then printf "${G}SELFTEST PASS${N} %s\n" "$2"; PASS=$((PASS+1));
@@ -228,6 +230,58 @@ SKIP_MODEL=1 bash "$HERE/testfirst-chain.sh" "$W" >"$W/out.txt" 2>&1; rc=$?
 if [ "$rc" -ne 0 ]; then report 0 "testfirst-chain REJECTS implementation-before-test (negative control)";
 else report 1 "testfirst-chain REJECTS implementation-before-test (negative control)"; sed -n '/TEST-FIRST assertions/,$p' "$W/out.txt"; fi
 rm -rf "$W"; unset SIM_tf1 SIM_tf2
+
+# ---------- bdd: each posture reads its own sibling and writes its own artefact ----------
+# The readlog is written by a real PreToolUse(Read) hook live; here the sims stand in for it, appending the
+# sibling path a correctly-routing /bdd would open, and producing the artefact each posture yields.
+W="$(mktemp -d)"; bash "$HERE/fixture-bdd.sh" "$W" >/dev/null
+P="$W/bdd-proj"; RL="$W/readlog.txt"
+BDD="$PLUGIN_DIR/skills/bdd"
+SIM_author='
+  printf "%s\n%s\n" "'"$BDD"'/SKILL.md" "'"$BDD"'/authoring.md" >> "'"$RL"'"
+  cat >> "'"$P"'/docs/phases/phase-1/backlog.md" <<BL
+
+## Issue FR-2 — subtract two numbers through the registry
+### Acceptance criteria
+\`\`\`gherkin
+Scenario: a user subtracts two numbers through the calculator
+  Given the calc package with subtract registered
+  When apply is called with "subtract", 5 and 3
+  Then the result is 2
+\`\`\`
+BL
+  : > "$out"'
+SIM_realize='
+  printf "%s\n%s\n" "'"$BDD"'/SKILL.md" "'"$BDD"'/realizing.md" >> "'"$RL"'"
+  cd "'"$P"'" && git checkout -q issue/FR-1-add
+  printf "from calc import apply\n\n\ndef test_add():\n    assert apply(\"add\", 2, 3) == 5\n" > tests/test_add.py
+  : > "$out"'
+export SIM_author SIM_realize
+SKIP_MODEL=1 bash "$HERE/bdd-chain.sh" "$W" >"$W/out.txt" 2>&1; rc=$?
+report "$rc" "bdd-chain assertions can pass"
+[ "$rc" -eq 0 ] || sed -n '/BDD ROUTING assertions/,$p' "$W/out.txt"
+rm -rf "$W"; unset SIM_author SIM_realize
+
+# ---------- negative control: the WRONG sibling on each turn must FAIL ----------
+# The failure the split exists to prevent: /bdd loads the authoring rules while realizing (and vice versa),
+# so the realizer is told to WRITE the scenario it must treat as immutable. The routing assertions must
+# reject it.
+W="$(mktemp -d)"; bash "$HERE/fixture-bdd.sh" "$W" >/dev/null
+P="$W/bdd-proj"; RL="$W/readlog.txt"; BDD="$PLUGIN_DIR/skills/bdd"
+SIM_author='
+  printf "%s\n%s\n" "'"$BDD"'/SKILL.md" "'"$BDD"'/realizing.md" >> "'"$RL"'"
+  printf "\n## Issue FR-2 — subtract\n### Acceptance criteria\n\`\`\`gherkin\nScenario: subtract\n  Given x\n  When y\n  Then z\n\`\`\`\n" >> "'"$P"'/docs/phases/phase-1/backlog.md"
+  : > "$out"'
+SIM_realize='
+  printf "%s\n%s\n" "'"$BDD"'/SKILL.md" "'"$BDD"'/authoring.md" >> "'"$RL"'"
+  cd "'"$P"'" && git checkout -q issue/FR-1-add
+  printf "from calc import apply\n\n\ndef test_add():\n    assert apply(\"add\", 2, 3) == 5\n" > tests/test_add.py
+  : > "$out"'
+export SIM_author SIM_realize
+SKIP_MODEL=1 bash "$HERE/bdd-chain.sh" "$W" >"$W/out.txt" 2>&1; rc=$?
+if [ "$rc" -ne 0 ]; then report 0 "bdd-chain REJECTS reading the wrong sibling (negative control)";
+else report 1 "bdd-chain REJECTS reading the wrong sibling (negative control)"; sed -n '/BDD ROUTING assertions/,$p' "$W/out.txt"; fi
+rm -rf "$W"; unset SIM_author SIM_realize
 
 echo
 printf "== selftest: %d passed, %d failed ==\n" "$PASS" "$FAIL"

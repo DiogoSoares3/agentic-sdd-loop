@@ -174,6 +174,33 @@ Plus: `develop` never receives any of it. As in `guard`, the positive control is
 > every `PreToolUse` guard — see the README's note on what the guards can and cannot see. These scenarios
 > assert the guards on the tools they are registered for, not an unescapable sandbox.
 
+### Scenario 7 — `bdd`: the skill routes to the right on-demand sibling
+
+`skills/bdd/` was split the way `grill-me` and `to-prd` are: a small `SKILL.md` with the shared derivation
+rule and a routing table, plus two siblings — `authoring.md` (PLAN: write the `Scenario:`) and
+`realizing.md` (BUILD: turn it into the failing outer test). The two modes hold **opposite postures** toward
+the same artefact: authoring writes it, realizing treats it as immutable and escalates rather than editing
+it. The routing table's whole claim is "load ONLY the one that matches" — because loading the other mode's
+file would put instructions in context the agent must not act on (telling the realizer to *write* the
+scenario it must not touch).
+
+This scenario tests that claim at the **skill's** altitude, not the loop's: it invokes `/bdd` directly in
+each posture and watches which sibling it opens, via a `PreToolUse(Read)` probe (`write_settings`' 5th
+argument) that logs every path read — the hook fires inside subagents too, but here the invocation is direct.
+
+| Turn | Invokes `/bdd` to… | Must read | Must **not** read |
+|---|---|---|---|
+| 1 | author a NEW scenario (FR-2) | `authoring.md` | `realizing.md` |
+| 2 | realize FR-1's existing scenario | `realizing.md` | `authoring.md` |
+
+The **negative** half of each pair is the real assertion. Reading the right file alone could be luck;
+reading the right one *and not* the wrong one is the routing working. Corroborated by the artefacts: turn 1
+appends a second `Scenario:` to the backlog, turn 2 writes a test at the `apply` seam and does not implement.
+
+> The probe is reset between turns so each turn's reads are attributed to that turn. The selftest's negative
+> control feeds the *wrong* sibling on each turn and requires the chain to fail — an assertion that never
+> rejects the mis-route proves nothing.
+
 ---
 
 ## Pieces
@@ -187,6 +214,7 @@ Plus: `develop` never receives any of it. As in `guard`, the positive control is
 | `fixture-red.sh` · `red-chain.sh` | scenario 4 — hollow-green-friendly seam + an out-of-project probe |
 | `fixture-tdd.sh` · `tdd-chain.sh` | scenario 5 — `required` flag vs a prompt that says to skip it |
 | `fixture-testfirst.sh` · `testfirst-chain.sh` | scenario 6 — on the issue branch with nothing committed |
+| `fixture-bdd.sh` · `bdd-chain.sh` | scenario 7 — /bdd invoked in each posture, a Read probe watches which sibling loads |
 | `run-bwrap.sh` | bubblewrap wrapper; runs one or all scenarios, prints a summary |
 | `selftest.sh` | drives every chain against a fabricated end state, plus a **negative control** per bad-path scenario. No model, seconds to run |
 
