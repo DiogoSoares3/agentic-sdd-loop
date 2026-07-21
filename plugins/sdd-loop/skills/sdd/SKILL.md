@@ -97,8 +97,9 @@ You are always in exactly one of these states. Decide which from `PROGRESS.md`, 
   (human-review) awaiting-review.
 ```
 
-> **BUILD → RECORD** lands each slice per the profile's **merge policy**: `auto-merge` → `done` in the
-> same dispatch; `human-review` → `in-review` (PR) until a human merges. SELECT loops back to BUILD
+> **BUILD → RECORD** never lands in the worker's dispatch: the worker returns `ready-to-land` and a bounded
+> lander takes it from there — `auto-merge` → `done`; `human-review` → `in-review` (PR) until a human
+> merges. SELECT loops back to BUILD
 > until the phase backlog is drained, then to PLAN for the next phase — see *Loop termination* below.
 
 ### SPEC (gate) — nothing gets built before this
@@ -180,11 +181,14 @@ critical seam. The **main session is the orchestrator**; each issue runs in a **
 [`sdd-issue-worker`](../../agents/issue-worker.md)** — a fresh subagent per issue (dispatch is always via
 subagents). Every issue is built on **its own branch off the integration branch
 (`develop`)** — the loop never commits to a protected branch. The profile's **`Concurrency`** knob is
-`serial` by default (one issue at a time, the worker lands its own branch); `parallel` is opt-in and, to
-avoid workers racing a moving `develop`, **builds parallel but lands serial** — see *build parallel, land
-serial* in the dispatcher. Per issue:
-- **Select:** first `todo` issue whose blockers are all `done` (**merged**); mark it `doing` and branch
-  `issue/<id>-<slug>` off the freshly-pulled integration branch.
+`serial` by default (one issue at a time); `parallel` is opt-in and, to avoid workers racing a moving
+`develop`, **builds parallel but lands serial** — see *build parallel, land serial* in the dispatcher. The
+knob only sets **how many workers build at once**: the land is always one bounded lander at a time, and the
+worker never merges in either mode. Per issue:
+- **Select:** first `todo` issue whose blockers are all `done` (**merged**); mark it `doing`. **You** create
+  and check out `issue/<id>-<slug>` off the freshly-pulled integration branch **before spawning** — branch
+  creation is the orchestrator's job alone, and the worker only attaches to it. Every integrity guard keys on
+  that branch, so a worker left on the integration branch would run unguarded.
 - **Dispatch the `sdd-issue-worker`** with the minimal context pack as **paths**: `.sdd/profile.md` + `PROGRESS.md` +
   `docs/phases/phase-N/prd.md` + `ARCHITECTURE.md`/relevant ADRs + **the one issue's scenario + its
   `Inner loop (TDD)` flag**. Not the whole PRD, not the backlog. The worker reads any other **existing**
@@ -195,23 +199,21 @@ serial* in the dispatcher. Per issue:
   implementation makes the outer test green with no inner loop. Done only when the outer behaviour test —
   **and** the inner units, if the inner loop ran — are green **and** the phase DoD items it touches pass
   (run the profile's **slice** command — the slice-gate). Refactor while green.
-- **Close:** land the issue per the profile's **merge policy** — `auto-merge` merges it to `done` in the
-  same dispatch (green + passing checks); `human-review` opens a PR and stops at `in-review` until a
-  human merges. **The regression-gate (the full accumulated suite) runs at this merge** — the provider's CI
-  checks, or the profile's full-suite command locally when the provider is `none`; a failure re-opens the
-  issue to fix the **code** (never a landed test). **In `parallel` mode the worker instead returns
-  `ready-to-land` (no merge)** and the orchestrator drains a **serial land queue** by dispatching a bounded
-  **`sdd-merge-resolver`** per item — one at a time — which rebases onto the current tip, resolves a conflict
-  via `/resolving-merge-conflicts` **only if one arises**, runs the regression-gate, and merges to `done`.
-  The coordinator never runs the suite or merges itself; it only serializes and records. The loop
-  continues, **non-blocking**, to the next issue whose blockers are `done`.
+- **Close:** the worker **never lands** — in any mode. It pushes its branch, sets the issue to
+  `ready-to-land`, and returns **still on its `issue/*` branch**. You then drain the land queue (the backlog
+  filtered to `ready-to-land`) **one item at a time**, dispatching a bounded **`sdd-merge-resolver`** per
+  item: rebase onto the current tip → resolve a conflict via `/resolving-merge-conflicts` **only if one
+  arises** → **regression-gate** (the full accumulated suite) → then `auto-merge` merges it to `done`, or
+  `human-review` opens the PR and stops at `in-review` until a human merges. A regression failure re-opens
+  the issue to fix the **code** (never a landed test). **You never rebase, run the suite, or merge in your
+  own context** — you only serialize and record. In `serial` the queue simply holds one item at a time. The
+  loop continues, **non-blocking**, to the next issue whose blockers are `done`.
 
 ### RECORD progress
-- Update `PROGRESS.md` and the **backlog status**: mark the slice `done` (serial auto-merge),
-  `ready-to-land` (parallel auto-merge — the serial land queue flips it to `done` once merged), or
-  `in-review` with its **PR URL** (human-review); note what changed, what's next, any open question. Under
-  human-review a human merging the PR flips the issue to `done`; under parallel the land queue merging
-  flips `ready-to-land → done` (both reconciled on next prime). **Keep it lean** — one concise
+- Update `PROGRESS.md` and the **backlog status**: a returning worker leaves the slice `ready-to-land`; the
+  lander flips it to `done` (auto-merge) or `in-review` with its **PR URL** (human-review); note what
+  changed, what's next, any open question. Under human-review a human merging the PR flips it to `done`
+  (reconciled on next prime). **Keep it lean** — one concise
   worklog line per slice, per PROGRESS.md's fixed structure; old phases are compacted to a mini-summary
   by the phase-opener, so don't accumulate old-issue detail.
 - **Update the `SDD-CURSOR` block** (the four fixed fields the `SessionStart` hook reads): `Phase`, `Doing`

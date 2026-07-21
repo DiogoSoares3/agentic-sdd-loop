@@ -66,6 +66,46 @@ git -C "$d" checkout -q -b issue/1-a
 chk "+hook OFF -> silent even for a landed test"     '[ -z "$(warn "'"$d"'" "'"$d"'/tests/test_l.py")" ]'
 
 echo
+echo "===== GROUP 1c — PreToolUse: issue-branch guard (always on, cursor-gated) ====="
+GRD="$H/sdd-guard-issue-branch.sh"
+grd(){ # $1 project-dir  $2 file_path -> exit code (0 allow / 2 block)
+  local json; json="$(jq -nc --arg f "$2" '{tool_input:{file_path:$f}}')"
+  CLAUDE_PROJECT_DIR="$1" bash "$GRD" >/dev/null 2>&1 <<<"$json"; echo $?
+}
+mkgrd(){ # $1 dir  $2 Doing-value : repo on develop with a cursor
+  local d="$1"; mkdir -p "$d/.sdd" "$d/docs"; git -C "$d" init -q -b develop
+  git -C "$d" config user.email t@t; git -C "$d" config user.name t
+  printf '## Git strategy\n- **Protected branch:** `main`\n- **Integration branch:** `develop`\n## Paths\n- **Durable state:** `docs/PROGRESS.md`\n' > "$d/.sdd/profile.md"
+  cursor_g(){ printf '<!-- SDD-CURSOR -->\n- Phase: 1\n- Doing: %s\n- Next: P1-9\n- Stop-reason: none\n<!-- /SDD-CURSOR -->\n' "$1"; }
+  cursor_g "$2" > "$d/docs/PROGRESS.md"
+  echo seed > "$d/README.md"; git -C "$d" add -A; git -C "$d" commit -qm seed
+}
+d="$BASE/gb1"; mkgrd "$d" P1-3                      # an issue IS in flight, we are on develop
+chk "issue doing + on develop + impl edit -> BLOCK"   '[ "$(grd "'"$d"'" "'"$d"'/src/x.py")" = 2 ]'
+chk "issue doing + on develop + TEST edit -> BLOCK"   '[ "$(grd "'"$d"'" "'"$d"'/tests/test_x.py")" = 2 ]'
+chk "issue doing + on develop + docs edit -> allow"   '[ "$(grd "'"$d"'" "'"$d"'/docs/NOTES.md")" = 0 ]'
+chk "issue doing + on develop + PROGRESS -> allow"    '[ "$(grd "'"$d"'" "'"$d"'/docs/PROGRESS.md")" = 0 ]'
+git -C "$d" checkout -q -b issue/3-x
+chk "issue doing + ON the issue branch -> allow"      '[ "$(grd "'"$d"'" "'"$d"'/src/x.py")" = 0 ]'
+git -C "$d" checkout -q -b main 2>/dev/null || git -C "$d" checkout -q main
+chk "issue doing + on PROTECTED main -> BLOCK"        '[ "$(grd "'"$d"'" "'"$d"'/src/x.py")" = 2 ]'
+d="$BASE/gb2"; mkgrd "$d" none                      # loop idle -> a human on develop is never bothered
+chk "Doing=none (loop idle) -> allow (no human friction)" '[ "$(grd "'"$d"'" "'"$d"'/src/x.py")" = 0 ]'
+d="$BASE/gb3"; mkdir -p "$d/src"                    # no profile at all -> not an SDD project
+chk "no .sdd/profile.md -> allow"                    '[ "$(grd "'"$d"'" "'"$d"'/src/x.py")" = 0 ]'
+d="$BASE/gb4"; mkgrd "$d" P1-3; rm -f "$d/docs/PROGRESS.md"
+chk "no durable state -> fail-open allow"            '[ "$(grd "'"$d"'" "'"$d"'/src/x.py")" = 0 ]'
+# relocated branches: the guard reads them from the profile, not hardcoded
+d="$BASE/gb5"; mkdir -p "$d/.sdd" "$d/state"; git -C "$d" init -q -b integration
+git -C "$d" config user.email t@t; git -C "$d" config user.name t
+printf '## Git strategy\n- **Protected branch:** `release`\n- **Integration branch:** `integration`\n## Paths\n- **Durable state:** `state/cursor.md`\n' > "$d/.sdd/profile.md"
+printf '<!-- SDD-CURSOR -->\n- Phase: 2\n- Doing: E2-7\n- Next: E2-8\n- Stop-reason: none\n<!-- /SDD-CURSOR -->\n' > "$d/state/cursor.md"
+echo seed > "$d/README.md"; git -C "$d" add -A; git -C "$d" commit -qm seed
+chk "relocated integration branch + cursor -> BLOCK"  '[ "$(grd "'"$d"'" "'"$d"'/src/x.py")" = 2 ]'
+git -C "$d" checkout -q -b issue/7-y
+chk "relocated project, on issue branch -> allow"     '[ "$(grd "'"$d"'" "'"$d"'/src/x.py")" = 0 ]'
+
+echo
 echo "===== GROUP 2 — SessionStart: re-prime injection ====="
 cursor(){ printf '<!-- SDD-CURSOR -->\n- Phase: %s\n- Doing: %s\n- Next: %s\n- Stop-reason: %s\n<!-- /SDD-CURSOR -->\n' "$1" "$2" "$3" "$4"; }
 mkproj(){ local d="$1" mode="$2"; mkdir -p "$d/.sdd" "$d/docs"; printf 'continuation mode: %s\n' "$mode" > "$d/.sdd/profile.md"; }

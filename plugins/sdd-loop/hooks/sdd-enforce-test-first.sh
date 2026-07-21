@@ -28,6 +28,13 @@ INPUT="$(cat)"
 FILE="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty')"
 [ -n "$FILE" ] || exit 0
 
+# Git questions are asked of the WORKING TREE the tool call runs in, not the project root: under
+# `Concurrency: parallel` each worker lives in its own `git worktree`, which has its own HEAD. Reading the
+# root's branch there would judge the wrong branch entirely. The profile is still read from the project root
+# (it is not per-worktree). Falls back to ROOT when the payload carries no cwd.
+CWD="$(printf '%s' "$INPUT" | jq -r '.cwd // empty')"
+WT="${CWD:-$ROOT}"
+
 # Classify by the path RELATIVE to the repo root, never the absolute path — otherwise an ancestor
 # directory named like "…test…" / "…spec…" / "…docs…" (e.g. a repo under ~/dev/testing/) would match
 # the patterns below for EVERY file and silently disable the guard. Strip the ROOT prefix; a path that
@@ -47,19 +54,19 @@ ALLOWPAT="${SDD_ALLOW_PATTERN:-(\.md$|\.mdx$|\.rst$|\.txt$|/docs/|/\.sdd/|/adrs?
 printf '%s' "$REL" | grep -qiE "$ALLOWPAT" && exit 0
 
 # Only guard while on an issue branch.
-git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 || exit 0
-BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo)"
+git -C "$WT" rev-parse --git-dir >/dev/null 2>&1 || exit 0
+BRANCH="$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo)"
 case "$BRANCH" in
   issue/*) : ;;
   *) exit 0 ;;
 esac
 
 # Establish the branch base; if we cannot, fail open.
-BASE="$(git -C "$ROOT" merge-base HEAD "$INT_BRANCH" 2>/dev/null || echo)"
+BASE="$(git -C "$WT" merge-base HEAD "$INT_BRANCH" 2>/dev/null || echo)"
 [ -n "$BASE" ] || exit 0
 
 # A test already committed on this branch? implementation is allowed.
-if git -C "$ROOT" diff --name-only "$BASE"..HEAD 2>/dev/null | grep -qiE "$TESTPAT"; then
+if git -C "$WT" diff --name-only "$BASE"..HEAD 2>/dev/null | grep -qiE "$TESTPAT"; then
   exit 0
 fi
 

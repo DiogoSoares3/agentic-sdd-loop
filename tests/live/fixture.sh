@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Faixa B fixture — builds a disposable, VALIDATED `calc` SDD project + a settings.json that
-# registers the plugin's four hooks (plus a probe that logs every SessionStart source).
+# registers the plugin's five hooks (plus a probe that logs every SessionStart source).
 # Pure setup: no model, no network. Isolation is the caller's job (Docker / sandbox-exec).
 #
 # Usage:  bash fixture.sh [WORKDIR]
@@ -107,7 +107,8 @@ cat > "$WORK/settings.json" <<EOF
       { "matcher": "Edit|Write",
         "hooks": [
           { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-enforce-test-first.sh'" },
-          { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-warn-landed-test-edit.sh'" }
+          { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-warn-landed-test-edit.sh'" },
+          { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-guard-issue-branch.sh'" }
         ] }
     ],
     "SubagentStop": [

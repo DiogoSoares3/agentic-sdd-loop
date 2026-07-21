@@ -42,7 +42,7 @@ compaction, then checking the `SessionStart(compact)` re-prime lets the orchestr
 ## Pieces
 
 - `fixture.sh [WORKDIR]` — builds the disposable `calc` project + a `settings.json` that registers the
-  plugin's four hooks (plus a SessionStart-source probe). Pure setup, no model. `PLUGIN_HOOKS` env points
+  plugin's five hooks (plus a SessionStart-source probe). Pure setup, no model. `PLUGIN_HOOKS` env points
   the settings at the hooks dir.
 - `compact-chain.sh WORKDIR` — the pure harness (runs `claude`, no isolation of its own).
 - `run-bwrap.sh` (Linux) / `run-macos-sandbox.sh` (macOS) — the OS-sandbox wrappers above.

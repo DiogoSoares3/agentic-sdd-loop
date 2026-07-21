@@ -4,7 +4,7 @@
 #   • issue/1-add is already LANDED on develop (add behaviour + its test).
 #   • issue/2-subtract is a ready-to-land branch that edits the SAME registry line, so rebasing it
 #     onto the moving develop conflicts — exactly the case the sdd-merge-resolver exists for.
-# Pure setup: no model, no network. Isolation is the caller's job (Docker). Registers all FOUR hooks
+# Pure setup: no model, no network. Isolation is the caller's job (Docker). Registers all FIVE hooks
 # (incl. the landed-test warning) + a SessionStart-source probe.
 #
 # Usage:  bash fixture-parallel.sh [WORKDIR]     (prints WORK=… / PROJ=… / SETTINGS=… on the last lines)
@@ -117,7 +117,7 @@ printf 'from calc import apply\n\ndef test_subtract():\n    assert apply("subtra
 git -C "$PROJ" add -A; git -C "$PROJ" commit -qm "issue/2: subtract op (ready-to-land)"
 git -C "$PROJ" checkout -q develop   # leave the run on develop; issue/2 branch awaits the land queue
 
-# settings.json — all FOUR hooks + a SessionStart source probe.
+# settings.json — all FIVE hooks + a SessionStart source probe.
 cat > "$WORK/settings.json" <<EOF
 {
   "hooks": {
@@ -132,7 +132,8 @@ cat > "$WORK/settings.json" <<EOF
       { "matcher": "Edit|Write",
         "hooks": [
           { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-enforce-test-first.sh'" },
-          { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-warn-landed-test-edit.sh'" }
+          { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-warn-landed-test-edit.sh'" },
+          { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-guard-issue-branch.sh'" }
         ] }
     ],
     "SubagentStop": [

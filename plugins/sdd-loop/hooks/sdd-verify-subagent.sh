@@ -69,10 +69,59 @@ case "$AGENT" in
     ;;
 esac
 
-# ---- sdd-issue-worker: claims green -> the issue/* branch must carry a committed test. ----
+prof_path() { { grep -iE "$1" "$PROFILE" 2>/dev/null | head -n1 | grep -oE '`[^`]+`' | head -n1 | tr -d '`'; } || true; }
+
+# ---- sdd-issue-worker ----
 WT="${CWD:-$ROOT}"
 git -C "$WT" rev-parse --git-dir >/dev/null 2>&1 || exit 0      # no git -> allow
 BRANCH="$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo)"
+
+# ---- Inner-TDD checkpoint: `Inner loop (TDD): required` must leave a durable trace. ----
+# The ONLY deterministic evidence that the inner loop actually ran. The worker is instructed to append
+# `<issue-id>: unit "<name>" green; next: …` to the durable-state file after each unit goes green (it is
+# also its own mid-issue resume point). Nothing else in the system reads the TDD flag, so without this a
+# `required` issue that only ever wrote the outer BDD test passes every guard silently.
+#
+# Runs BEFORE the branch check on purpose: under serial auto-merge the worker merges and ends up back on
+# the integration branch, so keying this on `issue/*` would make it dead code in the default config.
+# Fail-open at every step: no id, no backlog, no flag line, an unparseable entry -> allow.
+PROGRESS_REL="$(prof_path 'Durable state')"; : "${PROGRESS_REL:=docs/PROGRESS.md}"
+case "$PROGRESS_REL" in /*) PROGRESS="$PROGRESS_REL";; *) PROGRESS="$ROOT/$PROGRESS_REL";; esac
+
+# Which issue was this? The branch names it directly. When the worker has already merged and left the
+# branch (serial auto-merge ends on the integration branch), fall back to the cursor's `Doing:` field —
+# and if that is `none` too, we genuinely cannot tell which issue this was: fail open.
+ISSUE_ID=""
+case "$BRANCH" in
+  issue/*) ISSUE_ID="$(printf '%s' "${BRANCH#issue/}" | sed -E 's/-.*$//')" ;;
+  *) CURSOR="$(awk '/<!--[[:space:]]*SDD-CURSOR/{f=1;next} /<!--[[:space:]]*\/SDD-CURSOR/{f=0} f' "$PROGRESS" 2>/dev/null || true)"
+     ISSUE_ID="$( { printf '%s\n' "$CURSOR" \
+         | grep -iE '^[[:space:]]*[-*][[:space:]]*\**[[:space:]]*Doing[[:space:]]*\**[[:space:]]*:' \
+         | head -n1 \
+         | sed -E 's/^[[:space:]]*[-*][[:space:]]*\**[[:space:]]*Doing[[:space:]]*\**[[:space:]]*://I; s/^[[:space:]*]+//; s/[[:space:]*]+$//'
+       } || true )"
+     case "$(printf '%s' "$ISSUE_ID" | tr '[:upper:]' '[:lower:]')" in
+       ''|none|none*|unknown|n/a|-) ISSUE_ID="" ;;
+     esac ;;
+esac
+
+if [ -n "$ISSUE_ID" ]; then
+  PHASES_REL="$(prof_path 'Phases dir')"; : "${PHASES_REL:=docs/phases}"; PHASES_REL="${PHASES_REL%/}"
+  case "$PHASES_REL" in /*) PH_DIR="$PHASES_REL";; *) PH_DIR="$ROOT/$PHASES_REL";; esac
+  # The issue's backlog entry: from the heading naming this id up to the next heading.
+  ENTRY="$(cat "$PH_DIR"/*/backlog.md 2>/dev/null \
+            | awk -v id="$ISSUE_ID" 'tolower($0) ~ ("^#+ .*(^|[^a-z0-9])" tolower(id) "([^a-z0-9]|$)") {f=1;print;next} /^#+ /{f=0} f' \
+            || true)"
+  FLAG="$(printf '%s' "$ENTRY" | grep -iE 'inner loop' | head -n1 || true)"
+  # Only `required` is checked. `skipped`, an absent flag, or no entry at all -> nothing to prove -> allow.
+  if printf '%s' "$FLAG" | grep -qiE 'required' && ! printf '%s' "$FLAG" | grep -qiE 'skipped'; then
+    if ! grep -qiE "$ISSUE_ID.*unit.*green" "$PROGRESS" 2>/dev/null; then
+      block "sdd-issue-worker reports success on issue $ISSUE_ID, whose 'Inner loop (TDD)' flag is REQUIRED, but $PROGRESS_REL carries no inner-loop checkpoint for it. Run the inner TDD loop (unit test -> minimal code -> unit green, one behaviour at a time) and append a line per green unit — '$ISSUE_ID: unit \"<name>\" green; next: <what>' — which is also your only durable resume point if you compact mid-issue. If the flag is wrong for this slice, return needs-decision; never flip it yourself."
+    fi
+  fi
+fi
+
+# ---- claims green -> the issue/* branch must carry a committed test. ----
 case "$BRANCH" in
   issue/*) : ;;
   *) exit 0 ;;                                                  # already landed/discarded -> allow

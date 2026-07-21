@@ -3,7 +3,7 @@
 # THREE-item land queue: issue/1-add, issue/2-subtract, issue/3-multiply are all `ready-to-land`,
 # independent (no blockers between them), and each edits the SAME OPERATIONS registry line — so as the
 # orchestrator drains the queue serially, every land after the first hits a rebase conflict. develop stays
-# at base (nothing landed yet). Exercises the lander over a real multi-item queue. Registers all four hooks.
+# at base (nothing landed yet). Exercises the lander over a real multi-item queue. Registers all five hooks.
 #
 # Usage:  bash fixture-multi.sh [WORKDIR]     (prints WORK=… / PROJ=… / SETTINGS=… on the last lines)
 set -euo pipefail
@@ -149,7 +149,8 @@ cat > "$WORK/settings.json" <<EOF
       { "matcher": "Edit|Write",
         "hooks": [
           { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-enforce-test-first.sh'" },
-          { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-warn-landed-test-edit.sh'" }
+          { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-warn-landed-test-edit.sh'" },
+          { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-guard-issue-branch.sh'" }
         ] }
     ],
     "SubagentStop": [

@@ -73,11 +73,17 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
    - **Test command(s)** — the exact command that proves a slice green.
    - **Git strategy** — protected branch (default `main`, never committed to), integration branch
      (default `develop`), issue branch naming (`issue/<id>-<slug>`), **PR provider** (`none` default |
-     `gh` | `bitbucket-mcp`), and **merge policy** (`auto-merge` default — land on green+checks, fully
-     autonomous | `human-review` — open a PR, non-blocking, human merge flips `in-review → done`).
-     `human-review` **requires** a provider: if none is configured/available, default to `auto-merge`
-     (with `none` provider → local merge into the integration branch). Confirm the provider is reachable
-     (`gh auth status` / the Bitbucket MCP) before selecting `human-review`.
+     `gh` | `bitbucket-mcp`), and **merge policy**.
+     **The merge-policy default is conditional — probe first, then recommend.** Check whether a provider is
+     actually reachable (`gh auth status`, or the Bitbucket MCP responding):
+     - **Provider reachable → recommend `human-review`** (open a PR, non-blocking, a human merge flips
+       `in-review → done`). A human seeing each slice before it lands is the better default when it costs
+       nothing, so offer it as the recommendation — never force it.
+     - **No provider → `auto-merge` with provider `none`** (local merge into the integration branch, land on
+       green + a local full-suite run). This is a **first-class** configuration, not a degraded one: it is
+       what makes the plugin work out-of-the-box in a repo with no GitHub/Bitbucket, and what the unattended
+       mode is built on. Do **not** nag the user to install a provider.
+     `human-review` **requires** a provider — never select it without confirming one is reachable.
    - **Continuation mode** (gate at a boundary / on resume) — `ask` (default; the alive session pauses at a
      boundary or on re-entry, shows the resume cursor + recommended action, and asks the user whether to
      continue before dispatching) or `auto` (self-continuing/unattended; keeps dispatching without asking,

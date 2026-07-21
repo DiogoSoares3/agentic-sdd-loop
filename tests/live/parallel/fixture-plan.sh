@@ -3,7 +3,7 @@
 # with NO pre-seeded issue branches and NO backlog yet. It exists so the PLAN step can be tested in the
 # state PLAN actually runs in (a fresh repo), separately from the seeded merge-conflict fixture. The point
 # is to check that the cut backlog carries the `Touches` parallel-safety hint (the /to-issues change).
-# Pure setup: no model, no network. Registers all FOUR hooks + a SessionStart-source probe.
+# Pure setup: no model, no network. Registers all FIVE hooks + a SessionStart-source probe.
 #
 # Usage:  bash fixture-plan.sh [WORKDIR]     (prints WORK=… / PROJ=… / SETTINGS=… on the last lines)
 #   env: PLUGIN_HOOKS  hooks dir the settings.json points at.
@@ -109,7 +109,8 @@ cat > "$WORK/settings.json" <<EOF
       { "matcher": "Edit|Write",
         "hooks": [
           { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-enforce-test-first.sh'" },
-          { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-warn-landed-test-edit.sh'" }
+          { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-warn-landed-test-edit.sh'" },
+          { "type": "command", "command": "bash '$PLUGIN_HOOKS/sdd-guard-issue-branch.sh'" }
         ] }
     ],
     "SubagentStop": [

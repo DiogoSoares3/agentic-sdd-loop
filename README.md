@@ -48,8 +48,13 @@ validated with engineers). Everything below is **derived**: phase PRDs, backlog,
   flag, default on) until both are green. Integrity guards (immutable scenario+flag, prove-RED,
   test-first commits, clean re-run) prevent the agent from gaming its own test.
 
-Each issue is built on its **own branch off the integration branch** (`develop`); the loop never commits
-to `main`. **Escalation:** a subagent has no back-channel, so when a decision the baselines don't answer
+Each issue is built on its **own branch off the integration branch** (`develop`), **created by the
+orchestrator before the worker is spawned** — the worker only attaches to it, and never leaves it: it builds
+to green, returns `ready-to-land`, and a bounded **lander** does the rebase, the full regression suite and
+the merge (or opens the PR). One land path in every mode. That split is not tidiness — every integrity guard
+keys on the worker being on an `issue/*` branch, so a worker that merged (and thus checked out `develop`)
+used to leave those guards unable to tell a correct landing from a worker that never branched at all. The
+loop never commits to `main`. **Escalation:** a subagent has no back-channel, so when a decision the baselines don't answer
 arises (structural/critical) the worker **returns `needs-decision`**; the orchestrator runs **`/grill-me`**
 with the engineer (→ ADR) or stakeholder (→ PRD amendment) and **re-dispatches** — the spec grows,
 controlled. It never resolves a structural decision on its own. For a **weighty fork that needs asynchronous
@@ -86,14 +91,14 @@ MAIN SESSION = phase orchestrator   (you, running /sdd; re-driven by /loop)
 │
 ├─ PLAN a phase  → spawn  [sdd-phase-opener]   reads PRD+ARCH+ADRs → writes phase PRD + backlog → returns
 │
-├─ BUILD an issue (serial by default) → spawn [sdd-issue-worker]   double loop → land (serial) or
-│       │  ready-to-land (parallel) → returns report
+├─ BUILD an issue (serial by default) → orchestrator CREATES issue/<id> → spawn [sdd-issue-worker]
+│       │  double loop on that branch → never merges, never leaves it → returns ready-to-land
 │       │  (needs an existing ADR/PRD/ARCH? it READS it itself — the orchestrator is not a file server)
 │       └─ hits an uncovered structural decision? → returns `needs-decision`
 │              → orchestrator runs /grill-me with the human → new ADR / PRD amendment → re-dispatches
 │
-└─ LAND a queued branch (parallel mode) → spawn [sdd-merge-resolver]   rebase → resolve conflict IF any
-        → FULL regression suite → merge → returns `landed` / `needs-revalidation`
+└─ LAND a queued branch (EVERY mode) → spawn [sdd-merge-resolver]   rebase → resolve conflict IF any
+        → FULL regression suite → merge or open PR → returns `landed` / `in-review` / `needs-revalidation`
 ```
 
 **Three agents** (`agents/`), each self-contained and bounded to one context window:
@@ -101,20 +106,33 @@ MAIN SESSION = phase orchestrator   (you, running /sdd; re-driven by /loop)
 | Agent | Job | Returns |
 |---|---|---|
 | `sdd-phase-opener` | cut ONE phase: derive the epic, write its phase PRD + backlog (scenarios + TDD flags) | `phase N opened · M issues` |
-| `sdd-issue-worker` | build ONE issue to green via the BDD/TDD double loop, land per merge policy | `green` / `ready-to-land` / `blocked` / `needs-decision` / `needs-revalidation` |
-| `sdd-merge-resolver` | LAND ONE `ready-to-land` branch (parallel mode): rebase onto the tip, resolve a conflict via `/resolving-merge-conflicts` only if one arises, run the full regression suite, merge to `done` | `landed` / `needs-revalidation` / `needs-decision` / `blocked` |
+| `sdd-issue-worker` | build ONE issue to green via the BDD/TDD double loop, on the branch the orchestrator handed it — **never merges, never leaves that branch** | `ready-to-land` / `blocked` / `needs-decision` / `needs-revalidation` |
+| `sdd-merge-resolver` | LAND ONE `ready-to-land` branch — **the single land path, in every mode**: rebase onto the tip, resolve a conflict via `/resolving-merge-conflicts` only if one arises, run the full regression suite, then merge (`auto-merge`) or open the PR (`human-review`) | `landed` / `in-review` / `needs-revalidation` / `needs-decision` / `blocked` |
 
-**Four hooks** (`hooks/`), self-gating (silent no-op outside an SDD project; the `+hook` guard bites only
-when the profile enables it; the `SubagentStop` guard fails open on anything but the two agents it verifies) — this is
-how context injection and enforcement become **deterministic** instead of relying on the agent's
-self-discipline:
+**Five hooks** (`hooks/`), self-gating (silent no-op outside an SDD project; the `+hook` guards bite only
+when the profile enables them; the branch guard only while an issue is `doing`; the `SubagentStop` guard
+fails open on anything but the two agents it verifies) — this is how context injection and enforcement become
+**deterministic** instead of relying on the agent's self-discipline:
 
 | Hook | Fires | Does |
 |---|---|---|
 | `SessionStart` (resume\|compact) | main session resumes/compacts | **re-injects** `PROGRESS.md` + the re-prime checklist (via `additionalContext`) so the loop re-enters instead of freelancing — the one load-bearing compaction-survival mechanism |
 | `PreToolUse` (Edit\|Write) | any implementation edit, incl. inside subagents | **test-first enforcement** (`integrity: +hook`) — denies impl edits on an `issue/*` branch before a test is committed |
 | `PreToolUse` (Edit\|Write) | editing a test that already lives on the integration branch | **regression warning** (`integrity: +hook`, non-blocking) — flags editing a *landed* test on an `issue/*` branch (fix the code, not the test), with a false-positive caveat for shared fixtures |
-| `SubagentStop` | a bounded subagent (phase-opener / issue-worker) finishes | **verifies the exit** — blocks a "green" with no committed test, or an "opened" with no backlog; lets honest `blocked`/`needs-decision` returns through |
+| `PreToolUse` (Edit\|Write) | any code/test edit while an issue is `doing` | **issue-branch guard** (always on) — denies it on the integration/protected branch, so the loop can't build off an `issue/*` branch. Load-bearing: every other guard keys on that branch and **fails open** without it. Docs/spec/state stay allowed; with the cursor's `Doing: none` it never fires, so a human editing their own repo is untouched |
+| `SubagentStop` | a bounded subagent (phase-opener / issue-worker) finishes | **verifies the exit** — blocks a "green" with no committed test, a `required`-TDD issue with no inner-loop checkpoint in `PROGRESS.md`, or an "opened" with no backlog; lets honest `blocked`/`needs-decision` returns through |
+
+> **What the `PreToolUse` guards can and cannot see.** They are registered on **`Edit|Write`**, so they see
+> every edit made through those tools — and **nothing written through `Bash`**. A `cat > src/x.py <<EOF`,
+> a `sed -i`, a `git apply`, a `python -c` that writes a file: all invisible to test-first, to the
+> landed-test warning, and to the branch guard. This is not fixable by widening the matcher — deciding
+> whether an arbitrary shell command writes an implementation file means parsing arbitrary shell, which
+> fails open in more interesting ways than it closes. The guards also match on **paths, never contents**, so
+> a committed empty test satisfies test-first, and an implementation file living under a `spec/` directory
+> reads as a test. Treat `+hook` as what it is: a deterministic floor that makes the *honest* path the easy
+> one and catches the common slip — not a sandbox against a determined agent. The layers that do see through
+> it are `SubagentStop` (re-reads git and the durable files at exit, whatever tool wrote them) and the
+> optional `+verifier` (reads the diff's contents).
 
 There is deliberately **no `PreCompact` hook**: `PreCompact` cannot inject context into the model (it can
 only run a command or block), so a "flush reminder" there never reaches the agent — recovery lives in
@@ -190,13 +208,15 @@ any slot still holds placeholder text. The knobs:
 | **Backlog review** | `confirm` | gate at **PLAN** (phase scope): `confirm` (present the cut phase — scope + DoD + slices in order — for a **one-time** approval covering the whole phase, never per issue) \| `auto` (build straight away). The cut is reported either way |
 | **Integrity enforcement** | `prose+git +hook` | base + shipped `PreToolUse` guard (deny impl edits before a **BDD test** is committed on an `issue/*` branch — gates the always-required outer test, not the TDD flag). Add `+verifier` (agent) for a diff re-read. `SubagentStop` verify is always on regardless. |
 | **PR provider** | `none` | `none` (local merge) \| `gh` \| `bitbucket-mcp` |
-| **Merge policy** | `auto-merge` | `auto-merge` (unattended) \| `human-review` (PR gate; needs a provider) |
+| **Merge policy** | *conditional* | `human-review` (PR gate per slice — **the default when a provider is reachable**) \| `auto-merge` (**the default without one**, and the basis of unattended runs; lands on green + a local full-suite run). Both are first-class — the plugin never requires a provider |
 | **Git branches** | `main` / `develop` | protected (never committed) / integration; issues on `issue/<id>-<slug>` |
 | **Paths** | `docs/…` | baselines, PROGRESS, phases dir — **relocatable; agents, skills & the hooks all read the locations from here** |
 
 ### Prerequisites (only if you opt into them)
 
 - **`human-review` or PR provider `gh`** → the `gh` CLI installed and `gh auth status` authenticated.
+  `/sdd-init` probes for this: found → it recommends `human-review`; not found → `auto-merge` + provider
+  `none`, which is a fully supported setup, not a fallback.
 - **PR provider `bitbucket-mcp`** → the Bitbucket MCP server configured and reachable.
 - **`continuation: auto`** → for a truly unattended run; pair with a `/schedule` watchdog for crash recovery.
 - **Unattended crash recovery** → register a watchdog (`/schedule` or cron running `/sdd`) that
@@ -270,7 +290,7 @@ in `PROGRESS.md` and drives iterations via `/loop` (or the `auto` supervisor / a
 
 ### Testing Suite
 
-*   **Deterministic Hook Suite (`bash tests/faixa-a.sh`):** Runs the deterministic hook suite with 50 checks, completely independent of any model or network dependencies. It exercises all four core hooks—`SessionStart` re-prime, `PreToolUse` test-first, `PreToolUse` landed-test regression warning, and `SubagentStop` verify—alongside path-awareness tested against real, throwaway git repositories and profiles.
+*   **Deterministic Hook Suite (`bash tests/faixa-a.sh`):** Runs the deterministic hook suite, completely independent of any model or network dependencies. It exercises all five core hooks—`SessionStart` re-prime, `PreToolUse` test-first, `PreToolUse` landed-test regression warning, `PreToolUse` issue-branch guard, and `SubagentStop` verify—alongside path-awareness tested against real, throwaway git repositories and profiles.
 *   **Sub-suites:** You can also run `tests/subagentstop.sh` and `tests/test-paths.sh` standalone, as these are the specific sub-suites called by the main script.
 *   **Parallel / merge-resolver mechanics (`bash tests/parallel-merge.sh`):** A deterministic proof (real `git` + `pytest`, no model) that the `Concurrency: parallel` conflict scenario is sound: two parallel branches really conflict on rebase, a correct resolution makes the **full** suite green, a *weakening* resolution is caught by the regression gate, the landed test stays byte-identical, the landed-test warning fires, and a **multi-item land queue** drains N branches in dependency→backlog order (dependent-before-blocker goes red). Needs `python3`+`pytest`, so it runs on demand rather than inside `faixa-a.sh`.
 *   **PR/CI proxy (`bash tests/pr-ci-proxy.sh`):** A deterministic stand-in (real `git` + `pytest`, **no GitHub, no model**) for the `provider`/CI surface: a **bare repo as the remote** + a **merge gate that runs the full regression suite** before landing on a protected branch. Asserts a green feature lands, a *regressing* feature is **rejected** with the protected branch left pristine, and `develop → main` promotion is gated the same way — the isolatable equivalent of `provider: gh` + required checks.

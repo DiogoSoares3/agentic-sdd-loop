@@ -25,6 +25,11 @@ INPUT="$(cat)"
 FILE="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty')"
 [ -n "$FILE" ] || exit 0
 
+# Ask git about the WORKING TREE the call runs in (a parallel worker lives in its own `git worktree`, with
+# its own HEAD); the profile still comes from the project root. Falls back to ROOT when cwd is absent.
+CWD="$(printf '%s' "$INPUT" | jq -r '.cwd // empty')"
+WT="${CWD:-$ROOT}"
+
 # Classify by the path RELATIVE to the repo root (same reasoning as the test-first guard: an ancestor dir
 # named like "…test…" must not make every file look like a test).
 REL="${FILE#"$ROOT"/}"
@@ -36,8 +41,8 @@ INT_BRANCH="${SDD_INTEGRATION_BRANCH:-develop}"
 printf '%s' "$REL" | grep -qiE "$TESTPAT" || exit 0
 
 # Only warn while on an issue branch.
-git -C "$ROOT" rev-parse --git-dir >/dev/null 2>&1 || exit 0
-BRANCH="$(git -C "$ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo)"
+git -C "$WT" rev-parse --git-dir >/dev/null 2>&1 || exit 0
+BRANCH="$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo)"
 case "$BRANCH" in
   issue/*) : ;;
   *) exit 0 ;;
@@ -47,7 +52,7 @@ esac
 # (a new test this issue is creating, or the branch is unavailable) -> silent, no warning.
 landed=0
 for ref in "$INT_BRANCH" "origin/$INT_BRANCH"; do
-  if git -C "$ROOT" cat-file -e "$ref:$REL" 2>/dev/null; then landed=1; break; fi
+  if git -C "$WT" cat-file -e "$ref:$REL" 2>/dev/null; then landed=1; break; fi
 done
 [ "$landed" = 1 ] || exit 0
 

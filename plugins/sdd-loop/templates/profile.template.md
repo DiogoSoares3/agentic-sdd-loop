@@ -94,18 +94,21 @@ Two scopes (they may be the same command in a small project):
   arch doc owns "how a behaviour is tested in this project".
 - **Dispatch (fixed — always subagents):** the main-session orchestrator spawns a fresh **`sdd-issue-worker`**
   per issue (optionally in its own git worktree on the issue branch), a bounded **`sdd-phase-opener`** to
-  cut each phase, and a bounded **`sdd-merge-resolver`** to resolve a conflicting branch. Not a knob — the
-  whole architecture (coordinator in the main session, bounded leaves in subagents) depends on it. See the
-  dispatcher spec.
-- **Concurrency (how many issues build at once):**
-  - `serial` (**default**) — one issue at a time; the worker lands its own branch in the same dispatch. No
+  cut each phase, and a bounded **`sdd-merge-resolver`** to land each green branch. Not a knob — the whole
+  architecture (coordinator in the main session, bounded leaves in subagents) depends on it. The orchestrator
+  also **creates the issue branch before dispatching**; the worker only attaches to it. See the dispatcher spec.
+- **Concurrency (how many issues *build* at once — never how they land):**
+  - `serial` (**default**) — one issue at a time. The land queue never holds more than one item, so no
     cross-branch conflict is possible. Prefer this unless the backlog has many genuinely-independent slices.
   - `parallel` — opt-in: the orchestrator may co-dispatch workers for issues that are all-blockers-`done`
-    **and** touch **disjoint files/seams**; workers build to green and return `ready-to-land` **without
-    merging**. The orchestrator then drains a **serial land queue** by dispatching a bounded
-    `sdd-merge-resolver` per item (one at a time) that rebases onto the current tip, resolves a conflict only
-    if one arises, runs the regression gate, and merges — the coordinator never runs the suite or merges itself.
-    Only safe *because* the land is serialized — build parallel, land serial.
+    **and** touch **disjoint files/seams**. Only safe *because* the land is serialized — build parallel,
+    land serial.
+  **In both modes the worker never lands.** It builds to green on its own `issue/*` branch, returns
+  `ready-to-land`, and stays on that branch; the orchestrator then drains the queue one item at a time via a
+  bounded `sdd-merge-resolver` that rebases onto the current tip, resolves a conflict only if one arises,
+  runs the regression gate, and merges (or opens the PR). The coordinator never runs the suite or merges
+  itself, and the worker never leaves its branch — which is what keeps every integrity guard (all of which
+  key on being on an `issue/*` branch) actually reachable.
 - **Continuation mode (gate at a boundary / on resume):** governs what the orchestrator does when the loop
   reaches a boundary or re-enters after a compaction/crash — **not** who holds context (dispatch is always
   via subagents).
@@ -137,7 +140,11 @@ Two scopes (they may be the same command in a small project):
   always allowed). `+hook` also enables a **non-blocking** warning when a worker edits a test that already
   lives on the integration branch (a *landed* test — fix the code, not the test). Optionally add `+verifier`
   (an independent agent re-reads the **branch/PR diff** for test-gaming). Drop to bare `prose+git` only if the project's test paths don't match the default and you
-  don't want to set `SDD_TEST_PATTERN`. Escalate uncovered critical decisions via `/grill-me` → ADR/PRD;
+  don't want to set `SDD_TEST_PATTERN`. **Independent of this knob, two guards are always on:** the
+  `SubagentStop` exit verification, and the `PreToolUse` **issue-branch guard** — while an issue is `doing`,
+  no code/test edit is allowed on the integration/protected branch, so the loop builds on an `issue/*` branch
+  or not at all (docs/spec/state stay allowed; idle loop = never fires).
+  Escalate uncovered critical decisions via `/grill-me` → ADR/PRD;
 for a **weighty fork that needs asynchronous team sign-off**, the assistant may instead **suggest** a
 **Request for Comments** (`/to-rfc` → `docs/rfcs/`, status `to-be-validated`) that, once the team validates
 it, materializes into an ADR/PRD amendment (`validated (ADR-NNNN)`) — suggested, never forced.
@@ -148,13 +155,16 @@ it, materializes into an ADR/PRD amendment (`validated (ADR-NNNN)`) — suggeste
 - **Issue branch naming:** `issue/<id>-<slug>`.
 - **PR provider:** `none` (default) | `gh` (GitHub CLI) | `bitbucket-mcp` (Bitbucket MCP). The provider is
   the PR surface; `none` lands locally with no PR. `human-review` **requires** a provider.
-- **Merge policy:**
-  - `auto-merge` (default) — land each issue on green **+ passing checks/CI**, no human gate. With a
-    provider: open the PR and merge it when checks pass. With `none`: merge the issue branch into
-    `develop` locally. Fully autonomous; the backlog drains straight to `done`.
-  - `human-review` — open a PR and stop at `in-review`; the loop is **non-blocking** (moves to the next
-    issue whose blockers are landed); a human merges, flipping it to `done`. Autonomous within a phase,
-    human merge-gate at each phase boundary.
+- **Merge policy** — the default is **conditional on a provider being reachable**, decided at `/sdd-init`:
+  - `human-review` (**default when a provider is reachable**) — open a PR and stop at `in-review`; the loop
+    is **non-blocking** (moves to the next issue whose blockers are landed); a human merges, flipping it to
+    `done`. Autonomous within a phase, human merge-gate per slice. If every remaining issue is blocked by an
+    open PR, the phase pauses at `awaiting-review` until someone merges — that pause is the point.
+  - `auto-merge` (**default when there is no provider**, and the basis of unattended runs) — land each issue
+    on green **+ passing checks/CI**, no human gate. With a provider: open the PR and merge it when checks
+    pass. With `none`: run the full-suite command locally, then merge the issue branch into `develop`. Fully
+    autonomous; the backlog drains straight to `done`. This is a **first-class** configuration — a repo with
+    no GitHub/Bitbucket runs the loop with the same guarantees, the regression gate just runs locally.
 - **Regression gate (at merge to a non-feature branch):** the **full-suite/regression command** must pass
   before an issue lands on the integration branch (and before `develop → main`). Placement is flexible —
   the plugin does **not** impose a CI config:
@@ -165,9 +175,10 @@ it, materializes into an ADR/PRD amendment (`validated (ADR-NNNN)`) — suggeste
     landing, so the default config is never unprotected.
   A failure here never weakens a test — it re-opens the issue to fix the **code** (a genuine behaviour
   change escalates as `needs-revalidation`).
-- **Backlog statuses:** `todo → doing → done` (serial auto-merge) · `todo → doing → ready-to-land → done`
-  (parallel auto-merge — `ready-to-land` = green + pushed, awaiting the orchestrator's serial land queue) ·
-  `todo → doing → in-review → done` (human-review).
+- **Backlog statuses** (`ready-to-land` = green + pushed, awaiting the lander — it is on **every** path,
+  serial and parallel alike, because the worker never lands):
+  `todo → doing → ready-to-land → done` (auto-merge) ·
+  `todo → doing → ready-to-land → in-review → done` (human-review).
 
 ## Paths
 > **Load-bearing — every downstream tool + hook reads artifact locations from here.** Relocate the baselines /

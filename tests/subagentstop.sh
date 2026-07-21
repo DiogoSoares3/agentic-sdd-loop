@@ -98,6 +98,45 @@ d="$BASE/o-nd"; make_opener "$d" nobacklog
 run "opener needs-decision (no backlog)"  ALLOW "$d" "$(json_opener 'needs-decision: split FR-3 into two phases?')"
 
 echo
+echo "== inner-TDD checkpoint: required flag must leave a PROGRESS trace =="
+# make_tdd <dir> <flag-line> <progress-extra>  : a worker repo + a backlog entry + durable state
+make_tdd() {
+  local d="$1" flag="$2" prog="$3"
+  make_worker "$d" withtest
+  mkdir -p "$d/docs/phases/phase-1"
+  printf '## Issue FR-1 — parse the thing\nInner loop (TDD): %s\nBlocked by: None\n' "$flag" \
+    > "$d/docs/phases/phase-1/backlog.md"
+  printf '# PROGRESS\n\n## Worklog\n%s\n' "$prog" > "$d/docs/PROGRESS.md"
+}
+d="$BASE/t-req-missing"; make_tdd "$d" 'required' '- FR-1: outer scenario green.'
+run "required flag, NO unit checkpoint"   BLOCK "$d" "$(json_worker "$d" 'Outcome: green — landed done. pytest 1 passed.')"
+
+d="$BASE/t-req-ok"; make_tdd "$d" 'required' '- FR-1: unit "tokenize" green; next: parse rows.'
+run "required flag, checkpoint present"   ALLOW "$d" "$(json_worker "$d" 'Outcome: green — landed done. pytest 3 passed.')"
+
+d="$BASE/t-skipped"; make_tdd "$d" 'skipped — declarative config, scenario covers it' '- FR-1: outer green.'
+run "skipped flag, no checkpoint needed"  ALLOW "$d" "$(json_worker "$d" 'Outcome: green — landed done.')"
+
+d="$BASE/t-nobacklog"; make_worker "$d" withtest      # no backlog at all -> cannot read the flag
+run "no backlog entry -> fail-open allow" ALLOW "$d" "$(json_worker "$d" 'Outcome: green — landed done.')"
+
+d="$BASE/t-req-esc"; make_tdd "$d" 'required' '- FR-1: nothing yet.'
+run "required flag but honest blocked"    ALLOW "$d" "$(json_worker "$d" 'Outcome: blocked — fixture missing.')"
+
+# The check must survive the worker having already merged and left the issue branch (serial auto-merge):
+# with no issue/* branch to read, the issue id comes from the cursor's Doing field.
+cursor_doing(){ printf '<!-- SDD-CURSOR -->\n- Phase: 1\n- Doing: %s\n- Next: none\n- Stop-reason: none\n<!-- /SDD-CURSOR -->\n' "$1"; }
+d="$BASE/t-req-ondev"; make_tdd "$d" 'required' '- FR-1: outer scenario green.'
+{ cursor_doing FR-1; printf '\n## Worklog\n- FR-1: outer scenario green.\n'; } > "$d/docs/PROGRESS.md"
+git -C "$d" checkout -q develop
+run "on develop, cursor names the issue"  BLOCK "$d" "$(json_worker "$d" 'Outcome: green — landed done.')"
+
+d="$BASE/t-req-nocursor"; make_tdd "$d" 'required' '- FR-1: outer scenario green.'
+{ cursor_doing none; printf '\n## Worklog\n- FR-1: outer scenario green.\n'; } > "$d/docs/PROGRESS.md"
+git -C "$d" checkout -q develop
+run "on develop, cursor Doing=none -> open" ALLOW "$d" "$(json_worker "$d" 'Outcome: green — landed done.')"
+
+echo
 printf "== %d passed, %d failed ==\n" "$PASS" "$FAIL"
 rm -rf "$BASE"
 [ "$FAIL" -eq 0 ]
