@@ -18,7 +18,10 @@ is authored on the issue and **realized** by whatever test mechanism the project
 ### 1. Authoring (called by `/to-issues`)
 For each vertical issue, write **one `Scenario:`** capturing the slice's observable behaviour.
 
-- **Given** = the state/fixtures the slice assumes (name the seam from `ARCHITECTURE.md`).
+- **Given** = the seam the behaviour is observed through (name it from `ARCHITECTURE.md`) plus any
+  **external** fixture the slice needs. Name the **system as delivered** — never the state this slice is
+  supposed to establish. A `Given` that describes the slice's own outcome leaves the test nothing to do but
+  arrange that outcome and assert it back.
 - **When** = the single action the slice performs.
 - **Then** = the observable outcome that makes it demoable — the acceptance boundary.
 - **Declarative, not imperative:** state *what*, not UI/SQL steps. Use the project's domain glossary.
@@ -38,6 +41,11 @@ fixed type. Steps:
 
 1. Read `ARCHITECTURE.md`/ADRs to find the **seam** and the **test mechanism** for THIS project.
 2. Write the behaviour test at that seam so it **fails** for the right reason (feature absent).
+   **Arrange nothing you are about to assert.** External fixtures are fine; writing to the public surface
+   you then check is not — registering, patching or seeding the very state the slice is supposed to produce
+   makes the test pass over an unbuilt system, because the `Then` only re-reads what the `Given` just wrote.
+   The tell: if the test goes red once you remove that setup, the setup **was** the feature, and it belongs
+   in the implementation.
 3. Hand off to `/tdd` for the inner loop **when the issue's `Inner loop (TDD)` flag is `required`** (the
    default) — the slice is done when the inner units **and** this outer behaviour test are green. When the
    flag is `skipped`, there is no inner loop: the slice is done when **this outer behaviour test** is green

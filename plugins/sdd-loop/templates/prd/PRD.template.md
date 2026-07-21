@@ -56,7 +56,9 @@ The **complete, validated** "done" for this version, per the régua — a **chec
 observable/verifiable acceptance statement anchored to the requirement ID(s) it closes. This is
 **product-level** acceptance; the *technical* testing decisions (seams, test types, mocking, prior art)
 live in `ARCHITECTURE.md`, not here. Keep every item as a `- [ ]` checkbox so "done" can be ticked off
-literally.
+literally. Each item states what the **delivered system does**, observed from outside it — "the test suite
+is green" is circular (the suite is what these items exist to justify) and cannot catch a suite that passes
+over a system that was never wired up.
 
 - [ ] <checkable, observable acceptance statement> → `FR-1`, `FR-2`
 - [ ] <checkable, observable acceptance statement> → `NFR-1`

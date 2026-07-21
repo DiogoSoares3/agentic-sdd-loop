@@ -93,5 +93,39 @@ rm -rf "$d/spec/phases/phase-1"; mkdir -p "$d/spec/phases"
 O="$(runVS 'phase 1 opened · 1 issue' "$d")"; ok "verify: relocated phases now empty -> BLOCK" 'isblock "$O"'
 
 echo
+echo "== THE SHIPPED TEMPLATE must work with its own hooks =="
+# Every other case here hand-writes a minimal profile, so the artifact `/sdd-init` actually scaffolds was
+# never fed to the hooks that read it. It did not work: the Paths section is introduced by an explanatory
+# blockquote that NAMES "Durable state" and "Phases dir", and a first-match grep picked THAT line — the
+# re-prime resolved its state file to `SessionStart` and reported the cursor as unknown, silently disabling
+# the one load-bearing compaction-survival mechanism for every scaffolded project.
+d="$BASE/shipped"; mkdir -p "$d/.sdd" "$d/docs/phases/phase-1"
+cp "$REPO/plugins/sdd-loop/templates/profile.template.md" "$d/.sdd/profile.md"
+cursor 6 none E6-2 none > "$d/docs/PROGRESS.md"
+printf -- '- E6-2: slice\n' > "$d/docs/phases/phase-1/backlog.md"
+OUT="$(CLAUDE_PROJECT_DIR="$d" bash "$SS" </dev/null | jq -r '.hookSpecificOutput.additionalContext' 2>/dev/null)"
+ok "shipped template: re-prime finds docs/PROGRESS.md (Phase 6 / Next E6-2)" \
+   'printf "%s" "$OUT" | grep -q "Phase: 6 | Doing: none | Next: E6-2"'
+ok "shipped template: re-prime does NOT resolve state to a prose word" \
+   '! printf "%s" "$OUT" | grep -qi "from SessionStart"'
+# The template documents `ask` as the default; prose elsewhere in it mentions the unattended mode. Reading
+# that mention as the setting would silently run a supervised project unattended.
+ok "shipped template: continuation mode reads as the documented default (ask)" \
+   'printf "%s" "$OUT" | grep -qi "Continuation mode = ask"'
+O="$(runVS 'phase 1 opened · 1 issue' "$d")"
+ok "shipped template: verify reads the real phases dir -> ALLOW" '! isblock "$O"'
+rm -rf "$d/docs/phases/phase-1"; mkdir -p "$d/docs/phases"
+O="$(runVS 'phase 1 opened · 1 issue' "$d")"
+ok "shipped template: verify still BLOCKS an empty phases dir" 'isblock "$O"'
+# The guard hook parses the same section for the branch names.
+GRD="$HDIR/sdd-guard-issue-branch.sh"
+cursor 6 E6-2 E6-3 none > "$d/docs/PROGRESS.md"
+git -C "$d" init -q -b develop 2>/dev/null
+git -C "$d" config user.email t@t; git -C "$d" config user.name t
+echo seed > "$d/README.md"; git -C "$d" add -A >/dev/null 2>&1; git -C "$d" commit -qm seed >/dev/null 2>&1
+RC="$(jq -nc --arg f "$d/src/x.py" '{tool_input:{file_path:$f}}' | CLAUDE_PROJECT_DIR="$d" bash "$GRD" >/dev/null 2>&1; echo $?)"
+ok "shipped template: guard reads the real integration branch -> BLOCK on develop" '[ "$RC" = 2 ]'
+
+echo
 printf "== %d passed, %d failed ==\n" "$PASS" "$FAIL"
 rm -rf "$BASE"; [ "$FAIL" -eq 0 ]

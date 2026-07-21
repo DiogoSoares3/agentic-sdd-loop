@@ -50,7 +50,9 @@ How tests run without cloud/live systems.
 > data:    dbt seeds (tiny CSV fixtures)
 
 ## Definition of Done (per-phase gates)
-The checklist a phase must satisfy to be done.
+The checklist a phase must satisfy to be done. At least one item must be **observable behaviour of the
+delivered system**, not only "the tests pass" — a gate defined solely by the suite cannot catch a suite that
+goes green over a system that was never wired up.
 > e.g. "test command green + PK/source/data-quality tests pass + audited number reconciles"
 
 ## Phase-cutting rule
@@ -126,8 +128,8 @@ Two scopes (they may be the same command in a small project):
     scope (its PRD) + the backlog together**, then BUILD proceeds straight through the **whole** backlog
     **without pausing per issue** (only a worker's `blocked` / `needs-decision` / `needs-revalidation`, or
     the phase draining, stops it). One approval per phase — never one per issue.
-  - `auto` — the `sdd-phase-opener`'s cut goes straight to BUILD. Pick this for unattended runs (pair with
-    `Continuation mode: auto`).
+  - `auto` — the `sdd-phase-opener`'s cut goes straight to BUILD. Pick this for unattended runs, together
+    with the unattended continuation mode below.
   Under **either** setting the orchestrator **reports** the cut (scope + DoD + the slices in order) in plain
   terms; this knob only decides whether it *waits* for approval. The two baselines stay the only
   human-validated docs — this is a lightweight gate on the derived layer.

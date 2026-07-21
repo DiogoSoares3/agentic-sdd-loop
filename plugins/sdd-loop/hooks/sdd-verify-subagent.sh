@@ -55,9 +55,10 @@ block() {  # $1 = reason shown in the subagent's transcript
 # ---- sdd-phase-opener: claims a phase opened -> a non-empty backlog must exist. ----
 case "$AGENT" in
   *sdd-phase-opener)
-    # Phases dir is read from the profile's Paths section (first backtick-quoted token on the
-    # "Phases dir" line), so a project can relocate it out of docs/. Falls back to the default.
-    prof_path() { { grep -iE "$1" "$PROFILE" 2>/dev/null | head -n1 | grep -oE '`[^`]+`' | head -n1 | tr -d '`'; } || true; }
+    # Phases dir comes from the profile's Paths section: the key must appear as a LABEL (word boundary +
+    # colon) and the path is the first backtick-quoted token after it — prose merely MENTIONING the key
+    # must not win. A project can relocate it out of docs/; falls back to the default.
+    prof_path() { { grep -ivE "^[[:space:]]*>" "$PROFILE" 2>/dev/null | grep -iE "(^|[[:space:]*])$1[[:space:]]*\**[[:space:]]*:" | head -n1 | sed -E "s/^.*$1[[:space:]]*\**[[:space:]]*://I" | grep -oE '`[^`]+`' | head -n1 | tr -d '`'; } || true; }
     PHASES_REL="$(prof_path 'Phases dir')"; : "${PHASES_REL:=docs/phases}"; PHASES_REL="${PHASES_REL%/}"
     case "$PHASES_REL" in /*) PH_DIR="$PHASES_REL";; *) PH_DIR="$ROOT/$PHASES_REL";; esac
     [ -d "$PH_DIR" ] || exit 0                   # nonstandard/absent path -> fail-open
@@ -69,7 +70,7 @@ case "$AGENT" in
     ;;
 esac
 
-prof_path() { { grep -iE "$1" "$PROFILE" 2>/dev/null | head -n1 | grep -oE '`[^`]+`' | head -n1 | tr -d '`'; } || true; }
+prof_path() { { grep -ivE "^[[:space:]]*>" "$PROFILE" 2>/dev/null | grep -iE "(^|[[:space:]*])$1[[:space:]]*\**[[:space:]]*:" | head -n1 | sed -E "s/^.*$1[[:space:]]*\**[[:space:]]*://I" | grep -oE '`[^`]+`' | head -n1 | tr -d '`'; } || true; }
 
 # ---- sdd-issue-worker ----
 WT="${CWD:-$ROOT}"

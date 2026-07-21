@@ -53,8 +53,9 @@ git -C "$WT" rev-parse --git-dir >/dev/null 2>&1 || exit 0
 BRANCH="$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo)"
 [ -n "$BRANCH" ] || exit 0
 
-# First backtick-quoted token on the named profile line (same parser as the other hooks).
-prof_tok() { { grep -iE "$1" "$PROFILE" 2>/dev/null | head -n1 | grep -oE '`[^`]+`' | head -n1 | tr -d '`'; } || true; }
+# First backtick-quoted token after the named profile LABEL (same parser as the other hooks): the key must
+# be followed by a colon, so prose that merely mentions "integration branch" cannot win the match.
+prof_tok() { { grep -ivE "^[[:space:]]*>" "$PROFILE" 2>/dev/null | grep -iE "(^|[[:space:]*])$1[[:space:]]*\**[[:space:]]*:" | head -n1 | sed -E "s/^.*$1[[:space:]]*\**[[:space:]]*://I" | grep -oE '`[^`]+`' | head -n1 | tr -d '`'; } || true; }
 INT="${SDD_INTEGRATION_BRANCH:-$(prof_tok 'Integration branch')}"; : "${INT:=develop}"
 PROT="${SDD_PROTECTED_BRANCH:-$(prof_tok 'Protected branch')}";    : "${PROT:=main}"
 

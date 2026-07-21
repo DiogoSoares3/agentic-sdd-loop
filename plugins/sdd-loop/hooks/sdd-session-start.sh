@@ -17,9 +17,12 @@ ROOT="${CLAUDE_PROJECT_DIR:-$PWD}"
 PROFILE="$ROOT/.sdd/profile.md"
 [ -f "$PROFILE" ] || exit 0
 
-# Durable-state path is read from the profile's Paths section (the first backtick-quoted token on the
-# "Durable state" line), so a project can relocate PROGRESS.md out of docs/. Falls back to the default.
-prof_path() { { grep -iE "$1" "$PROFILE" 2>/dev/null | head -n1 | grep -oE '`[^`]+`' | head -n1 | tr -d '`'; } || true; }
+# Durable-state path comes from the profile's Paths section. The key must appear as a LABEL — at a line/word
+# boundary and followed by a colon — and the path is the first backtick-quoted token AFTER that colon.
+# Blockquotes are skipped. Both matter: the shipped template's own prose mentions "Durable state" and
+# "Phases dir" while explaining them, and a looser first-match grep resolved the state file to a word out of
+# that explanation, silently reporting the cursor as unknown. Falls back to the default.
+prof_path() { { grep -ivE "^[[:space:]]*>" "$PROFILE" 2>/dev/null | grep -iE "(^|[[:space:]*])$1[[:space:]]*\**[[:space:]]*:" | head -n1 | sed -E "s/^.*$1[[:space:]]*\**[[:space:]]*://I" | grep -oE '`[^`]+`' | head -n1 | tr -d '`'; } || true; }
 PROGRESS_REL="$(prof_path 'Durable state')"; : "${PROGRESS_REL:=docs/PROGRESS.md}"
 case "$PROGRESS_REL" in /*) PROGRESS="$PROGRESS_REL";; *) PROGRESS="$ROOT/$PROGRESS_REL";; esac
 
@@ -44,8 +47,13 @@ fi
 : "${PHASE:=unknown}" "${DOING:=unknown}" "${NEXT:=unknown}" "${STOP:=unknown}"
 
 # --- Continuation mode from the profile (default ask). ---
+# Same label discipline as the path parser, and for the same reason: prose that merely MENTIONS the knob
+# ("pair this with Continuation mode: auto") must not decide it. A project that documents `ask` and gets
+# read as `auto` runs unattended without anyone choosing that. Skip blockquotes; require the key at a
+# line/word boundary followed by a colon.
 MODE=ask
-grep -qiE 'continuation( mode)?:.*auto' "$PROFILE" && MODE=auto
+grep -ivE "^[[:space:]]*>" "$PROFILE" 2>/dev/null \
+  | grep -qiE "(^|[[:space:]*])continuation( mode)?[[:space:]]*\**[[:space:]]*:.*auto" && MODE=auto
 
 # --- Derive the recommended next action from the stop reason. ---
 case "$(printf '%s' "$STOP" | tr '[:upper:]' '[:lower:]')" in
