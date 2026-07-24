@@ -48,12 +48,14 @@ main-session orchestrator (which has to survive compaction) and out of the worke
    Open and merge the PR through whatever the profile's `PR provider` names — `gh` for GitHub, the
    `mcp__bitbucket__*` tools for Bitbucket, `glab` for GitLab — rather than assuming one CLI; the mechanism is
    the provider's, the flow above is the same either way.
-   **Verification notes (advisory — into the PR body, whenever you open one).** Before you rebase, read the
-   worker's own commit history on the received branch (`base..HEAD`, as handed to you, before your rebase
-   rewrites it) for two concrete signals: (a) did the commit introducing the behaviour/unit test land
-   *before* the one implementing it, or did the implementation arrive first; (b) did any *later* commit
-   **weaken** a test an earlier commit introduced — assertions dropped, an expected value relaxed to match
-   the code. When you open a PR, record what you saw under a `## Verification notes` heading in the body —
+   **Verification notes (advisory — into the PR body, whenever you open one).** Before you rebase, walk the
+   worker's own commits on the received branch — `git log --oneline base..HEAD` for the order, and
+   `git log -p base..HEAD -- <the test paths>` to read the actual **diffs** of the test files, not just the
+   messages (as handed to you, before your rebase rewrites this history) — for two concrete signals: (a) did
+   the commit introducing the behaviour/unit test land *before* the one implementing it, or did the
+   implementation arrive first; (b) did any *later* commit **weaken** a test an earlier commit introduced —
+   assertions dropped, an expected value relaxed to match the code (visible only in the per-commit diff).
+   When you open a PR, record what you saw under a `## Verification notes` heading in the body —
    each signal `ok` or a one-line flag — so a human reviewer sees it before merging. This is an
    **observation, never a gate**: you still land per the merge policy and never block, weaken, or re-open
    anything on account of it. With no PR (auto-merge onto `none`) there is nowhere to note it — the
