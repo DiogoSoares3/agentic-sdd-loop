@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Agentic Spec-Driven Development methodology for code assistants: a PRD/ARCHITECTURE-driven build loop, packaged as a reusable plugin.",
-    "version": "0.3.0"
+    "version": "0.3.1"
   },
   "plugins": [
     {
