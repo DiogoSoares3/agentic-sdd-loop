@@ -27,8 +27,10 @@ sub-agents**. The job fits one context window by design — cut, write, stop.
    vertical-slice group, anchored to specific requirement IDs + DoD.
    **Check the result against the profile's `## Phase roadmap`** — the macro plan the user validated at the
    spec gate. It is **indicative**: your derivation wins (dependency order and the current baselines are the
-   truth), so **never** bend a cut to match it and never escalate over a mismatch. But if this phase differs
-   from the roadmap's line for it — different IDs, a different order, a phase that split or merged — **report
+   truth), so **never** bend a cut to match it and never escalate over a mismatch. Read its **`Excludes:`**
+   line for this phase as the macro-planner's boundary intent — a cut that annexes what a neighbour's
+   `Excludes` reserves is a divergence worth naming. But if this phase differs from the roadmap's entry for
+   it — different IDs, a different order, a phase that split or merged, or such a boundary crossing — **report
    the difference and the reason** in your return, so the orchestrator can surface it while the user approves
    the phase. A silent divergence from the plan they signed off on is the one thing to avoid.
 2. **Write the phase PRD** `docs/phases/phase-N/prd.md` from `${CLAUDE_PLUGIN_ROOT}/templates/prd/phase-PRD.template.md`
@@ -72,7 +74,7 @@ it) **without re-reading your files** — so return enough for that, and nothing
 - **DoD gate:** this phase's checkable items, one line each.
 - **Slices:** one line per issue — `<id> — <what it demos>` in the order they will run (blockers first),
   marking any that is `Inner loop (TDD): skipped`.
-- **Roadmap divergence:** `matches the roadmap`, or what differs from the roadmap's line for this phase and
+- **Roadmap divergence:** `matches the roadmap`, or what differs from the roadmap's entry for this phase and
   **why** (the ADR / amendment / dependency that moved it).
 
 Write those in **plain product/engineering terms**, not plugin jargon — a stakeholder reads them. Or return

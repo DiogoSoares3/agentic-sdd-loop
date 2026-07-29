@@ -238,7 +238,9 @@ pytest -q
 
 ## Phase roadmap
 - Phase 1 — Redirect hot path: FR-1, NFR-1 · DoD: p95 < 100ms under the load fixture
+  - Excludes: link CRUD (Phase 2); analytics (out of v1)
 - Phase 2 — Link management: FR-2, FR-3 · DoD: a link survives create → resolve → expire
+  - Excludes: the redirect read path (Phase 1); custom domains (deferred)
 
 ## Loop
 - Continuation mode: auto

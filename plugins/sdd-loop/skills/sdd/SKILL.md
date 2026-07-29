@@ -117,13 +117,17 @@ You are always in exactly one of these states. Decide which from `PROGRESS.md`, 
 - **Do not proceed to SELECT until the profile's "spec gate" is satisfied.** This gate is a hard stop.
 - **Both baselines validated → derive the phase roadmap, once, before the first PLAN.** While the profile's
   `## Phase roadmap` slot reads `PENDING`: apply the profile's **phase-cutting rule** to the validated root
-  `PRD.md` and lay out **every** epic the project is expected to run, in order — one line each: the epic, the
-  requirement IDs it realizes, and the root DoD item(s) it closes. **Present that list to the user in plain
+  `PRD.md` and lay out **every** epic the project is expected to run, in order. Each entry is a header (the
+  epic, the requirement IDs it realizes, the root DoD item(s) it closes) plus an **`Excludes:`** line naming
+  what the phase defers and to which neighbour — the inter-phase boundary the `sdd-phase-opener` cannot
+  re-derive from the baselines; add a one-line **`Delivers:`** only where the IDs don't make it obvious.
+  **Present that list to the user in plain
   product terms and get a quick ok** (adjust and re-present if they reorder or re-cut something), then write
   it into the slot. This is the **macro** validation — the user sees the whole shape of the project before
   anything is built, instead of discovering it one phase at a time. It is a **sketch, not a spec**: it is
-  derived, never grilled, carries no sign-off ceremony, and does not become a third baseline. Keep it to one
-  line per phase — the detail belongs to each phase's own PRD, cut just-in-time at PLAN.
+  derived, never grilled, carries no sign-off ceremony, and does not become a third baseline. Keep each entry
+  to that header + `Excludes` (+ an optional `Delivers`) — ADR / test / constraint detail belongs to each
+  phase's own PRD, cut just-in-time at PLAN.
 
 ### PLAN phase → phase PRD + epic backlog
 > **Internal, derived layer — no separate human sign-off.** `docs/phases/phase-N/prd.md` and its `backlog.md` are

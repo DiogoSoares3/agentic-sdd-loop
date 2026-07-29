@@ -61,7 +61,13 @@ How epics are sized and ordered (dependency order, must-first, one seam group pe
 ## Phase roadmap (derived; validated once, before the first PLAN)
 The project's epics in the order they are expected to run — the **macro plan the user signs off on** before
 any building, so nobody discovers the project's shape one phase at a time. Applying the rule above to the
-validated `PRD.md`, one line per phase.
+validated `PRD.md`, **one entry per phase**: a header (the epic, the requirement IDs it realizes, the DoD
+item(s) it closes) plus an **`Excludes:`** line naming what this phase defers and to which neighbouring
+phase. `Excludes` is the load-bearing field — the inter-phase **boundary** the `sdd-phase-opener` cannot
+re-derive from the baselines (they say *what* to build, not *whose* phase owns it), so it is the one detail
+worth writing here. Add a one-line **`Delivers:`** only where the IDs don't make the deliverable obvious;
+leave ADR / test / constraint detail to each phase's own PRD, cut just-in-time at PLAN. Still a **scope
+sketch, not a spec**.
 
 **Left `PENDING` by `/sdd-init`** (the PRD is still a skeleton then, so there is nothing to derive from).
 `/sdd` fills it at the **spec gate** — once both baselines are validated and before the first PLAN — by
