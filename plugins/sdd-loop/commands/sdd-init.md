@@ -101,8 +101,9 @@ the **only per-project file**: `.sdd/profile.md` (Layer 2), plus the durable sta
      RED proof, test-first commit, clean re-run) **plus** the shipped `PreToolUse` guard (`+hook`: on an
      `issue/*` branch, deny an implementation edit until a **behaviour/BDD test** is committed — this gates
      the BDD outer test, which is required for every issue, so it is orthogonal to the `Inner loop (TDD)`
-     flag; docs/spec/state edits are always allowed). Optionally add `+verifier` (independent agent re-reads
-     the branch/PR diff for test-gaming). If the project's test paths don't match the default detector,
+     flag; docs/spec/state edits are always allowed). Separately, when a PR is opened the `sdd-merge-resolver`
+     re-reads the branch diff for test-gaming and records advisory notes on it — there is no separate verifier
+     agent to configure. If the project's test paths don't match the default detector,
      mention setting `SDD_TEST_PATTERN` (else drop to bare `prose+git`). Independently of this knob, the
      `SubagentStop` guard verifies every worker's exit (a "green" with no committed test is blocked) — that
      backstop is always on.

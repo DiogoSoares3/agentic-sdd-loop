@@ -132,7 +132,7 @@ fails open on anything but the two agents it verifies) — this is how context i
 > reads as a test. Treat `+hook` as what it is: a deterministic floor that makes the *honest* path the easy
 > one and catches the common slip — not a sandbox against a determined agent. The layers that do see through
 > it are `SubagentStop` (re-reads git and the durable files at exit, whatever tool wrote them) and the
-> optional `+verifier` (reads the diff's contents).
+> `sdd-merge-resolver`'s advisory diff re-read (reads the branch diff's contents when it opens a PR).
 
 There is deliberately **no `PreCompact` hook**: `PreCompact` cannot inject context into the model (it can
 only run a command or block), so a "flush reminder" there never reaches the agent — recovery lives in
@@ -206,7 +206,7 @@ any slot still holds placeholder text. The knobs:
 | **Test command(s)** | — | the command that proves a slice green |
 | **Continuation mode** | `ask` | gate at a **boundary/resume**: `ask` (alive session shows the resume cursor + next action and asks before dispatching) \| `auto` (unattended; proceed without asking) |
 | **Backlog review** | `confirm` | gate at **PLAN** (phase scope): `confirm` (present the cut phase — scope + DoD + slices in order — for a **one-time** approval covering the whole phase, never per issue) \| `auto` (build straight away). The cut is reported either way |
-| **Integrity enforcement** | `prose+git +hook` | base + shipped `PreToolUse` guard (deny impl edits before a **BDD test** is committed on an `issue/*` branch — gates the always-required outer test, not the TDD flag). Add `+verifier` (agent) for a diff re-read. `SubagentStop` verify is always on regardless. |
+| **Integrity enforcement** | `prose+git +hook` | base + shipped `PreToolUse` guard (deny impl edits before a **BDD test** is committed on an `issue/*` branch — gates the always-required outer test, not the TDD flag). The `sdd-merge-resolver` re-reads the branch diff for test-gaming and notes it advisorily on the PR. `SubagentStop` verify is always on regardless. |
 | **PR provider** | `none` | `none` (local merge) \| `gh` \| `bitbucket-mcp` |
 | **Merge policy** | *conditional* | `human-review` (PR gate per slice — **the default when a provider is reachable**) \| `auto-merge` (**the default without one**, and the basis of unattended runs; lands on green + a local full-suite run). Both are first-class — the plugin never requires a provider |
 | **Git branches** | `main` / `develop` | protected (never committed) / integration; issues on `issue/<id>-<slug>` |

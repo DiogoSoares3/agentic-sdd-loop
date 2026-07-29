@@ -140,8 +140,9 @@ Two scopes (they may be the same command in a small project):
   (`+hook`: on an `issue/*` branch, deny an implementation edit until a **behaviour/BDD test** is committed
   — universal, since the BDD outer test is required even for TDD-`skipped` issues; docs/spec/state edits are
   always allowed). `+hook` also enables a **non-blocking** warning when a worker edits a test that already
-  lives on the integration branch (a *landed* test — fix the code, not the test). Optionally add `+verifier`
-  (an independent agent re-reads the **branch/PR diff** for test-gaming). Drop to bare `prose+git` only if the project's test paths don't match the default and you
+  lives on the integration branch (a *landed* test — fix the code, not the test). Separately, when a PR is
+  opened the `sdd-merge-resolver` re-reads the **branch diff** for test-gaming and records advisory notes on
+  it. Drop to bare `prose+git` only if the project's test paths don't match the default and you
   don't want to set `SDD_TEST_PATTERN`. **Independent of this knob, two guards are always on:** the
   `SubagentStop` exit verification, and the `PreToolUse` **issue-branch guard** — while an issue is `doing`,
   no code/test edit is allowed on the integration/protected branch, so the loop builds on an `issue/*` branch

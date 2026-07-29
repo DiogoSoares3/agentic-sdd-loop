@@ -295,8 +295,10 @@ Structural, not just prose (the full statements live in `agents/issue-worker.md`
     test that already lives on the integration branch, it emits an advisory (fix the code, not a landed
     test earlier issues depend on) — a *warning*, not a block, since a shared fixture may legitimately
     evolve. This is the soft guard for the regression-gate's "never edit a landed test" rule.
-  - **Verifier agent (opt-in, `integrity: +verifier`).** Re-reads the branch/PR diff for test-gaming
-    before the merge.
+  - **Lander diff re-read (advisory, no knob).** When it opens a PR, the `sdd-merge-resolver` re-reads the
+    worker's branch diff for test-gaming — test-first ordering, a self-weakened test — and records what it
+    saw as advisory **Verification notes** in the PR body. It surfaces, never blocks; there is no separate
+    verifier agent.
 
 **What the `PreToolUse` guards cannot see.** They are registered on `Edit|Write`, so anything written through
 **`Bash`** (`cat > f <<EOF`, `sed -i`, `git apply`, `python -c`) bypasses all three. Widening the matcher
@@ -304,7 +306,8 @@ does not fix it — deciding whether an arbitrary shell command writes an implem
 arbitrary shell. They also match **paths, not contents**: an empty committed test satisfies test-first, and
 an impl file under `spec/` reads as a test. So `+hook` is a deterministic floor that makes the honest path
 the easy one and catches the common slip; the layers that see through it are `SubagentStop` (re-reads git and
-the durable files at exit, whatever wrote them) and `+verifier` (reads the diff's contents).
+the durable files at exit, whatever wrote them) and the `sdd-merge-resolver`'s advisory diff re-read (reads
+the branch diff's contents when it opens a PR).
 
 ## Escalation — the orchestrator handles what a leaf can't
 
