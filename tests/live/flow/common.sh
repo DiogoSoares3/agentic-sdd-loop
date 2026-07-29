@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Faixa B · flow — shared fixture pieces. Sourced by the three fixture-*.sh; never run on its own.
 
-# write_settings <work-dir> <hooks-dir> <hooklog> [subagent-decision-log] [read-log]
+# write_settings <work-dir> <hooks-dir> <hooklog> [subagent-decision-log] [read-log] [skill-log]
 # Registers ALL FIVE shipped hooks headlessly, plus a probe that logs every SessionStart source.
 #
 # The optional 4th argument adds a LOG-ONLY duplicate of the SubagentStop verifier whose stdout goes to a
@@ -13,9 +13,14 @@
 # subagent) opens to a log — the seam the `bdd` scenario uses to prove /bdd routes to the RIGHT on-demand
 # sibling and never loads the other mode's file. Kept free of `$`/backslashes for the JSON-in-heredoc reason
 # noted below.
+#
+# The optional 6th argument adds a PreToolUse(Skill) probe that logs every skill NAME the model (or a
+# subagent) invokes — the direct seam the `worker` scenario uses to prove a dispatched sdd-issue-worker
+# actually invokes `/bdd` and `/tdd`, which a Read probe cannot see (the `/tdd` skill is self-contained in its
+# SKILL.md and reads no sibling). Same `$`/backslash-free JSON-safety rule.
 write_settings() {
-  local work="$1" hooks="$2" hooklog="$3" sublog="${4:-}" readlog="${5:-}"
-  local sub_extra="" read_block=""
+  local work="$1" hooks="$2" hooklog="$3" sublog="${4:-}" readlog="${5:-}" skilllog="${6:-}"
+  local sub_extra="" read_block="" skill_block=""
   # Logs one line per stop, ALWAYS — the verifier prints nothing when it allows, so appending its raw stdout
   # would leave an empty file for both "allowed every stop" and "never ran at all". The marker separates them.
   # Deliberately free of `$` and backslashes: this is a shell string embedded in a JSON string embedded in a
@@ -28,6 +33,10 @@ write_settings() {
   [ -n "$readlog" ] && read_block=",
       { \"matcher\": \"Read\",
         \"hooks\": [ { \"type\": \"command\", \"command\": \"jq -r '.tool_input.file_path // .tool_input.path // empty' >> '$readlog'; true\" } ] }"
+  # A PreToolUse(Skill) probe — logs the invoked skill name; own matcher, pure log, exit 0. Same JSON-safety.
+  [ -n "$skilllog" ] && skill_block=",
+      { \"matcher\": \"Skill\",
+        \"hooks\": [ { \"type\": \"command\", \"command\": \"jq -r '.tool_input.skill // .tool_input.command // empty' >> '$skilllog'; true\" } ] }"
   cat > "$work/settings.json" <<EOF
 {
   "hooks": {
@@ -44,7 +53,7 @@ write_settings() {
           { "type": "command", "command": "bash '$hooks/sdd-enforce-test-first.sh'" },
           { "type": "command", "command": "bash '$hooks/sdd-warn-landed-test-edit.sh'" },
           { "type": "command", "command": "bash '$hooks/sdd-guard-issue-branch.sh'" }
-        ] }$read_block
+        ] }$read_block$skill_block
     ],
     "SubagentStop": [
       { "matcher": "*",

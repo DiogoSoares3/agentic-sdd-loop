@@ -71,7 +71,10 @@ context deterministically:
   or block — so a "flush reminder" there never reaches the agent. It was removed; the durable files + this
   re-inject do the job.)
 - **Spawn pack** → when the orchestrator spawns a subagent, the pack (Task prompt) is assembled
-  deterministically from **file paths**. The subagent then reads those files itself.
+  deterministically from **file paths**. The subagent then reads those files itself. For the
+  `sdd-issue-worker` the pack also carries one **action directive** — invoke `/bdd` to realize the scenario,
+  then `/tdd` for the inner loop when the flag is `required` — because the dispatch instruction, not the
+  system prompt alone, is what reliably fires the skill.
 
 > These hooks are shipped in `hooks/` and are **self-gating**: silent no-op outside an SDD project; the
 > test-first `PreToolUse` guard only bites when the profile sets `integrity: +hook`; the `SubagentStop`

@@ -10,8 +10,8 @@ re-exposed read-only). Deterministic hook behaviour is already covered without a
 what needs a model is whether the **agent** actually obeys the split.
 
 ```bash
-bash tests/live/flow/run-bwrap.sh                  # all six scenarios
-SCENARIO=gates bash tests/live/flow/run-bwrap.sh   # one (gates|land|guard|red|tdd|testfirst)
+bash tests/live/flow/run-bwrap.sh                  # all eight scenarios
+SCENARIO=gates bash tests/live/flow/run-bwrap.sh   # one (gates|land|guard|red|tdd|testfirst|bdd|worker)
 SCENARIO="red tdd testfirst" bash tests/live/flow/run-bwrap.sh   # just the bad paths
 ```
 
@@ -201,13 +201,39 @@ appends a second `Scenario:` to the backlog, turn 2 writes a test at the `apply`
 > control feeds the *wrong* sibling on each turn and requires the chain to fail — an assertion that never
 > rejects the mis-route proves nothing.
 
+### Scenario 8 — `worker`: a dispatched worker actually invokes the skills
+
+Scenario 7 proved `/bdd` routes correctly when invoked **directly**. It never proved the thing the loop
+depends on: that a **dispatched `sdd-issue-worker`** invokes `/bdd` and `/tdd` at all. The gap was real and
+empirically found — the Task prompt was assembled paths-only, so the "invoke the skills" instruction lived
+only in the worker's *system* prompt, the weakest surface for driving an action; the fix put an explicit
+directive on the **dispatch** surface. This scenario is the end-to-end proof, at the loop's altitude: a Haiku
+**main agent** dispatches a Haiku `sdd-issue-worker` via the Task tool, and a `PreToolUse(Skill)` probe
+(`write_settings`' 6th argument — a Read probe cannot see `/tdd`, which is self-contained in its `SKILL.md`)
+logs every skill the worker invokes.
+
+Three dispatch **variations**, each a fresh main-agent session on a clean issue branch, probe reset between:
+
+| Ctx | Dispatch | Flag | Expect | Gate |
+|---|---|---|---|---|
+| A | directive: "invoke /bdd then /tdd" | `required` | `/bdd` **and** `/tdd` | hard |
+| B | paths-only (pre-fix) | `required` | the contrast baseline | observational |
+| C | directive | `skipped` | `/bdd`, **not** `/tdd` | hard |
+
+A proves the directive fires both skills; C proves the `Inner loop (TDD)` flag still gates the inner loop. B
+is the counterfactual the fix exists for — asserting a skill's *absence* live is flaky (the system prompt
+alone sometimes fires it), so B surfaces its counts as the contrast rather than gating on them. Skills are
+counted across the session; only the worker invokes `/bdd`/`/tdd` (the orchestrator's skill is `/sdd`), so
+the count is the worker's. The selftest's negative control is a `skipped` worker that fires `/tdd` anyway —
+the chain must reject it.
+
 ---
 
 ## Pieces
 
 | File | What |
 |---|---|
-| `common.sh` | the `settings.json` writer (all five hooks + a `SessionStart` probe + the optional verifier log) and the shared assertion helpers: `has_test_only_commit`, `test_only_commits`, `proves_red`, `probe_delivered`, `had_checkpoint_in_history`, `gate_probe` |
+| `common.sh` | the `settings.json` writer (all five hooks + a `SessionStart` probe + optional verifier / `Read` / `Skill` probes) and the shared assertion helpers: `has_test_only_commit`, `test_only_commits`, `proves_red`, `probe_delivered`, `had_checkpoint_in_history`, `gate_probe` |
 | `fixture-gates.sh` · `gates-chain.sh` | scenario 1 — clean repo, `PENDING` roadmap, `confirm` |
 | `fixture-land.sh` · `land-chain.sh` | scenario 2 — pre-cut backlog, serial, TDD flags on both settings |
 | `fixture-guard.sh` · `guard-chain.sh` | scenario 3 — issue in flight, wrong branch checked out |
@@ -215,6 +241,7 @@ appends a second `Scenario:` to the backlog, turn 2 writes a test at the `apply`
 | `fixture-tdd.sh` · `tdd-chain.sh` | scenario 5 — `required` flag vs a prompt that says to skip it |
 | `fixture-testfirst.sh` · `testfirst-chain.sh` | scenario 6 — on the issue branch with nothing committed |
 | `fixture-bdd.sh` · `bdd-chain.sh` | scenario 7 — /bdd invoked in each posture, a Read probe watches which sibling loads |
+| `fixture-worker.sh` · `worker-chain.sh` | scenario 8 — a main agent dispatches a real sdd-issue-worker; a Skill probe watches which skills it invokes across three dispatch variations |
 | `run-bwrap.sh` | bubblewrap wrapper; runs one or all scenarios, prints a summary |
 | `selftest.sh` | drives every chain against a fabricated end state, plus a **negative control** per bad-path scenario. No model, seconds to run |
 

@@ -283,6 +283,47 @@ if [ "$rc" -ne 0 ]; then report 0 "bdd-chain REJECTS reading the wrong sibling (
 else report 1 "bdd-chain REJECTS reading the wrong sibling (negative control)"; sed -n '/BDD ROUTING assertions/,$p' "$W/out.txt"; fi
 rm -rf "$W"; unset SIM_author SIM_realize
 
+# ---------- worker: a dispatched sdd-issue-worker invokes the right skills per dispatch variation ----------
+# The skilllog is written by a real PreToolUse(Skill) hook live; here the sims stand in for it, appending the
+# skill names a correct worker would invoke under each dispatch (and the `sdd-issue-worker` marker the chain
+# greps from the stream to confirm the main agent dispatched at all).
+W="$(mktemp -d)"; bash "$HERE/fixture-worker.sh" "$W" >/dev/null
+SL="$W/skilllog.txt"; RL="$W/readlog.txt"; BDD="$PLUGIN_DIR/skills/bdd"
+SIM_A='
+  printf "sdd-loop:bdd\nsdd-loop:tdd\n" >> "'"$SL"'"
+  printf "%s\n" "'"$BDD"'/realizing.md" >> "'"$RL"'"
+  printf "sdd-issue-worker\n" > "$out"'
+SIM_B='printf "sdd-issue-worker\n" > "$out"'   # paths-only: no skill invoked — the contrast baseline
+SIM_C='
+  printf "sdd-loop:bdd\n" >> "'"$SL"'"
+  printf "%s\n" "'"$BDD"'/realizing.md" >> "'"$RL"'"
+  printf "sdd-issue-worker\n" > "$out"'
+export SIM_A SIM_B SIM_C
+SKIP_MODEL=1 PLUGIN_DIR="$PLUGIN_DIR" bash "$HERE/worker-chain.sh" "$W" >"$W/out.txt" 2>&1; rc=$?
+report "$rc" "worker-chain assertions can pass"
+[ "$rc" -eq 0 ] || sed -n '/WORKER-DISPATCH assertions/,$p' "$W/out.txt"
+rm -rf "$W"; unset SIM_A SIM_B SIM_C
+
+# ---------- negative control: a SKIPPED issue whose worker invokes /tdd anyway must FAIL ----------
+# The gate C proves: the `Inner loop (TDD)` flag still governs the inner loop. If a skipped-flag worker fires
+# /tdd, the chain must reject it — otherwise the conditional assertion is worthless.
+W="$(mktemp -d)"; bash "$HERE/fixture-worker.sh" "$W" >/dev/null
+SL="$W/skilllog.txt"; RL="$W/readlog.txt"; BDD="$PLUGIN_DIR/skills/bdd"
+SIM_A='
+  printf "sdd-loop:bdd\nsdd-loop:tdd\n" >> "'"$SL"'"
+  printf "%s\n" "'"$BDD"'/realizing.md" >> "'"$RL"'"
+  printf "sdd-issue-worker\n" > "$out"'
+SIM_B='printf "sdd-issue-worker\n" > "$out"'
+SIM_C='
+  printf "sdd-loop:bdd\nsdd-loop:tdd\n" >> "'"$SL"'"
+  printf "%s\n" "'"$BDD"'/realizing.md" >> "'"$RL"'"
+  printf "sdd-issue-worker\n" > "$out"'
+export SIM_A SIM_B SIM_C
+SKIP_MODEL=1 PLUGIN_DIR="$PLUGIN_DIR" bash "$HERE/worker-chain.sh" "$W" >"$W/out.txt" 2>&1; rc=$?
+if [ "$rc" -ne 0 ]; then report 0 "worker-chain REJECTS a skipped-flag worker that invokes /tdd (negative control)";
+else report 1 "worker-chain REJECTS a skipped-flag worker that invokes /tdd (negative control)"; sed -n '/WORKER-DISPATCH assertions/,$p' "$W/out.txt"; fi
+rm -rf "$W"; unset SIM_A SIM_B SIM_C
+
 echo
 printf "== selftest: %d passed, %d failed ==\n" "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

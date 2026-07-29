@@ -195,7 +195,9 @@ worker never merges in either mode. Per issue:
   that branch, so a worker left on the integration branch would run unguarded.
 - **Dispatch the `sdd-issue-worker`** with the minimal context pack as **paths**: `.sdd/profile.md` + `PROGRESS.md` +
   `docs/phases/phase-N/prd.md` + `ARCHITECTURE.md`/relevant ADRs + **the one issue's scenario + its
-  `Inner loop (TDD)` flag**. Not the whole PRD, not the backlog. The worker reads any other **existing**
+  `Inner loop (TDD)` flag**. Not the whole PRD, not the backlog. **Also direct it, in the pack, to invoke
+  `/bdd` (realize the scenario) then `/tdd` (inner loop, when `required`)** — the dispatch instruction is what
+  fires the skills, not the system prompt alone. The worker reads any other **existing**
   spec file itself; the orchestrator is not a file server.
 - **Double loop inside the dispatch:** `/bdd` realizes the scenario as the failing behaviour test
   (outer red) → then, **only when the issue's `Inner loop (TDD)` flag is `required`**
